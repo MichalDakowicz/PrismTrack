@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-background: #131315;
+  --color-surface: #111114;
+  --color-surface-hover: #1A1A1E;
+  --color-surface-well: #0e0e10;
+  --color-surface-card: #201f21;
+  
+  --color-primary: #7C5CFF;
+  --color-primary-foreground: #e6deff;
+  --color-on-primary: #31009a;
+  
+  --color-accent: #00D4AA;
+  --color-accent-foreground: #e6fff9;
+  
+  --color-border: #1F1F24;
+  --color-border-muted: #2A2A30;
+  --color-border-strong: #484555;
+  
+  --color-text-main: #e5e1e4;
+  --color-text-muted: #c9c4d8;
+  --color-text-dim: #8B8B99;
+
+  --radius-sm: 4px;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-main font-sans antialiased;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full hover:bg-text-dim transition-colors;
+  }
+}
+
+.brutalist-grid {
+  background-size: 40px 40px;
+  background-image: radial-gradient(circle, var(--color-border) 1px, transparent 1px);
+}

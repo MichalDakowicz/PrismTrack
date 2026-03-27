@@ -1,0 +1,5 @@
+{
+  "name": "PrismTrack",
+  "description": "A GitHub-native project tracker for small development teams, featuring a minimalist, high-density interface synced with GitHub Issues and Pull Requests.",
+  "requestFramePermissions": []
+}
