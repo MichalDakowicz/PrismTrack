@@ -728,6 +728,49 @@ async function startServer() {
     }
   });
 
+  app.patch("/api/github/issues/:owner/:repo/:issueNumber/labels", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo, issueNumber } = req.params;
+    const { labels } = req.body;
+
+    if (!labels || !Array.isArray(labels)) {
+      return res.status(400).json({ error: "Labels must be an array" });
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ labels }),
+      });
+
+      if (response.status === 403) {
+        const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+        if (rateLimitRemaining === "0") {
+          return res.status(403).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+        }
+        const error = await response.json();
+        return res.status(403).json({ error: error.message || "Access forbidden" });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to update labels" });
+      }
+
+      const issue = await response.json();
+      res.json(issue);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update labels" });
+    }
+  });
+
   // GitHub Webhook Endpoint
   app.post("/api/webhook/github", (req, res) => {
     const event = req.headers["x-github-event"];
