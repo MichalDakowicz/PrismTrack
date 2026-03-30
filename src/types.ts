@@ -69,3 +69,19 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface BranchUser {
+  login: string;
+  avatar_url: string;
+}
+
+export interface Branch {
+  name: string;
+  commit: { sha: string; url: string };
+  protected: boolean;
+  protection_url?: string;
+  lastCommitDate: string;
+  author: BranchUser;
+  pullRequest?: { number: number; state: string; url: string };
+  repository: { full_name: string; name: string };
+}

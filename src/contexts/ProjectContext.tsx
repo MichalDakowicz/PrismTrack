@@ -31,11 +31,18 @@ interface ProjectContextValue {
 
 const ProjectContext = createContext<ProjectContextValue | undefined>(undefined);
 
+const STORAGE_KEY = "prismtrack_active_project";
+
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(STORAGE_KEY);
+    }
+    return null;
+  });
   const [service, setService] = useState<ProjectService | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -134,6 +141,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   const selectProject = useCallback((projectId: string | null) => {
     setActiveProjectId(projectId);
+    if (projectId) {
+      localStorage.setItem(STORAGE_KEY, projectId);
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }, []);
 
   const activeProject = useMemo(

@@ -11,14 +11,25 @@ function nowIso(): string {
 }
 
 export class MongoProjectRepository implements ProjectRepository {
-  private readonly collection: Collection<ProjectRecord>;
+  private readonly dbOrProvider: Db | (() => Promise<Db>);
 
-  constructor(db: Db) {
-    this.collection = db.collection<ProjectRecord>("projects");
+  constructor(dbOrProvider: Db | (() => Promise<Db>)) {
+    this.dbOrProvider = dbOrProvider;
+  }
+
+  private async getCollection(): Promise<Collection<ProjectRecord>> {
+    const db =
+      typeof this.dbOrProvider === "function"
+        ? await this.dbOrProvider()
+        : this.dbOrProvider;
+
+    return db.collection<ProjectRecord>("projects");
   }
 
   async ensureIndexes(): Promise<void> {
-    await this.collection.createIndexes([
+    const collection = await this.getCollection();
+
+    await collection.createIndexes([
       { key: { workspaceId: 1, updatedAt: -1 }, name: "workspace_updatedAt" },
       {
         key: {
@@ -31,14 +42,17 @@ export class MongoProjectRepository implements ProjectRepository {
   }
 
   async listProjects(workspaceId: string): Promise<ProjectRecord[]> {
-    return this.collection
+    const collection = await this.getCollection();
+
+    return collection
       .find({ workspaceId })
       .sort({ updatedAt: -1 })
       .toArray();
   }
 
   async getProjectById(workspaceId: string, projectId: string): Promise<ProjectRecord | null> {
-    return this.collection.findOne({ workspaceId, id: projectId });
+    const collection = await this.getCollection();
+    return collection.findOne({ workspaceId, id: projectId });
   }
 
   async createProject(input: CreateProjectInput): Promise<ProjectRecord> {
@@ -53,7 +67,8 @@ export class MongoProjectRepository implements ProjectRepository {
       updatedAt: nowIso(),
     };
 
-    await this.collection.insertOne(project);
+    const collection = await this.getCollection();
+    await collection.insertOne(project);
     return project;
   }
 
@@ -79,7 +94,9 @@ export class MongoProjectRepository implements ProjectRepository {
       updatePayload.linkedRepositories = input.linkedRepositories;
     }
 
-    const result = await this.collection.findOneAndUpdate(
+    const collection = await this.getCollection();
+
+    const result = await collection.findOneAndUpdate(
       { workspaceId, id: projectId },
       { $set: updatePayload },
       { returnDocument: "after" }
@@ -89,7 +106,8 @@ export class MongoProjectRepository implements ProjectRepository {
   }
 
   async deleteProject(workspaceId: string, projectId: string): Promise<boolean> {
-    const result = await this.collection.deleteOne({ workspaceId, id: projectId });
+    const collection = await this.getCollection();
+    const result = await collection.deleteOne({ workspaceId, id: projectId });
     return result.deletedCount === 1;
   }
 }

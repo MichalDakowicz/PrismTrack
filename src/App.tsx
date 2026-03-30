@@ -10,6 +10,7 @@ import { Landing } from "./views/Landing";
 import { CommandPalette } from "./components/CommandPalette";
 import { Projects } from "./views/Projects";
 import { ProjectDetail } from "./views/ProjectDetail";
+import { Branches } from "./views/Branches";
 import { WorkspaceSectionPlaceholder } from "./views/WorkspaceSectionPlaceholder";
 
 export default function App() {
@@ -48,10 +49,7 @@ export default function App() {
           <Route path="/issues" element={<IssuesList />} />
           <Route path="/board" element={<Board />} />
           <Route path="/pull-requests" element={<PullRequests />} />
-          <Route
-            path="/branches"
-            element={<WorkspaceSectionPlaceholder title="Branches" description="Branch tracking and stale branch indicators will appear here." />}
-          />
+          <Route path="/branches" element={<Branches />} />
           <Route
             path="/repositories"
             element={<WorkspaceSectionPlaceholder title="Repositories" description="Workspace repository management and linking controls will appear here." />}

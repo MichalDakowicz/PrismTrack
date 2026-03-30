@@ -21,21 +21,52 @@ export function createMongoConnectionManager(
 
   let client: MongoClient | null = null;
   let db: Db | null = null;
+  let connectingPromise: Promise<Db> | null = null;
 
-  async function connect(): Promise<Db> {
-    if (db) {
-      return db;
+  async function resetConnection(): Promise<void> {
+    if (client) {
+      try {
+        await client.close();
+      } catch {
+        // Best effort close; we'll recreate the client anyway.
+      }
     }
+    client = null;
+    db = null;
+  }
 
-    client = createClient(config.uri, {
+  async function connectFresh(): Promise<Db> {
+    const nextClient = createClient(config.uri, {
       connectTimeoutMS: config.connectTimeoutMS,
       socketTimeoutMS: config.socketTimeoutMS,
       serverSelectionTimeoutMS: config.serverSelectionTimeoutMS,
     });
 
-    await client.connect();
-    db = client.db(config.dbName);
+    await nextClient.connect();
+    client = nextClient;
+    db = nextClient.db(config.dbName);
     return db;
+  }
+
+  async function connect(): Promise<Db> {
+    if (db && client) {
+      try {
+        await db.command({ ping: 1 });
+        return db;
+      } catch {
+        await resetConnection();
+      }
+    }
+
+    if (connectingPromise) {
+      return connectingPromise;
+    }
+
+    connectingPromise = connectFresh().finally(() => {
+      connectingPromise = null;
+    });
+
+    return connectingPromise;
   }
 
   function getDb(): Db {
@@ -59,11 +90,8 @@ export function createMongoConnectionManager(
   }
 
   async function close(): Promise<void> {
-    if (client) {
-      await client.close();
-    }
-    client = null;
-    db = null;
+    connectingPromise = null;
+    await resetConnection();
   }
 
   function isConnected(): boolean {

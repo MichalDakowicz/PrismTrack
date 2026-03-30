@@ -74,8 +74,7 @@ async function startServer() {
     console.warn("Using in-memory project repository due to USE_IN_MEMORY_PROJECT_REPO=true");
   } else {
     try {
-      const db = await mongoConnectionManager.connect();
-      projectRepository = new MongoProjectRepository(db);
+      projectRepository = new MongoProjectRepository(() => mongoConnectionManager.connect());
       await projectRepository.ensureIndexes();
       repositoryMode = "mongodb";
       console.log(`MongoDB connected: ${databaseConfig.dbName}`);
@@ -400,6 +399,98 @@ async function startServer() {
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch pull requests" });
     }
+  });
+
+  app.get("/api/github/branches", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { repo } = req.query;
+    const repos = repo ? [repo as string] : [];
+
+    if (repos.length === 0) {
+      return res.status(400).json({ error: "Repository is required" });
+    }
+
+    const allBranches: any[] = [];
+
+    for (const fullName of repos) {
+      try {
+        const branchesResponse = await fetch(
+          `https://api.github.com/repos/${fullName}/branches?per_page=100`,
+          {
+            headers: {
+              Authorization: `token ${token}`,
+              "User-Agent": "PrismTrack",
+            },
+          }
+        );
+
+        if (!branchesResponse.ok) {
+          console.error(`Failed to fetch branches for ${fullName}: ${branchesResponse.status}`);
+          continue;
+        }
+
+        const branches = await branchesResponse.json();
+
+        const branchesWithAuthor = await Promise.all(
+          branches.map(async (branch: any) => {
+            try {
+              const commitResponse = await fetch(branch.commit.url, {
+                headers: {
+                  Authorization: `token ${token}`,
+                  "User-Agent": "PrismTrack",
+                },
+              });
+
+              if (commitResponse.ok) {
+                const commit = await commitResponse.json();
+                return {
+                  ...branch,
+                  author: {
+                    login: commit.author?.login || commit.commit?.author?.name || "unknown",
+                    avatar_url: commit.author?.avatar_url || "",
+                  },
+                  lastCommitDate: commit.commit?.author?.date || new Date().toISOString(),
+                };
+              }
+            } catch {
+              // Fallback to basic data
+            }
+            return {
+              ...branch,
+              author: { login: "unknown", avatar_url: "" },
+              lastCommitDate: new Date().toISOString(),
+            };
+          })
+        );
+
+        branchesWithAuthor.forEach((branch) => {
+          allBranches.push({
+            name: branch.name,
+            commit: {
+              sha: branch.commit.sha,
+              url: branch.commit.url,
+            },
+            protected: branch.protected,
+            protection_url: branch.protection_url,
+            lastCommitDate: branch.lastCommitDate,
+            author: branch.author,
+            pullRequest: undefined,
+            repository: {
+              full_name: fullName,
+              name: fullName.split("/")[1],
+            },
+          });
+        });
+      } catch (error) {
+        console.error(`Error fetching branches for ${fullName}:`, error);
+      }
+    }
+
+    allBranches.sort((a, b) => new Date(b.lastCommitDate).getTime() - new Date(a.lastCommitDate).getTime());
+
+    res.json(allBranches);
   });
 
   app.post("/api/github/issues", async (req, res) => {
