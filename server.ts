@@ -1,6 +1,7 @@
 import express from "express";
+import net from "net";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import { createServer as createViteServer, ViteDevServer } from "vite";
 import cookieSession from "cookie-session";
 import dotenv from "dotenv";
 import { assertDatabaseConfig, getDatabaseConfig } from "./backend/config/database";
@@ -15,6 +16,31 @@ import { MongoProjectRepository } from "./backend/repositories/mongoProjectRepos
 import { ProjectRepository, validateProjectInput } from "./backend/repositories/projectRepository";
 
 dotenv.config();
+
+async function isPortFree(port: number, host = "127.0.0.1"): Promise<boolean> {
+  return await new Promise<boolean>((resolve) => {
+    const tester = net
+      .createServer()
+      .once("error", () => {
+        resolve(false);
+      })
+      .once("listening", () => {
+        tester.close(() => resolve(true));
+      })
+      .listen(port, host);
+  });
+}
+
+async function findAvailablePort(startPort: number, maxAttempts = 20): Promise<number> {
+  for (let offset = 0; offset < maxAttempts; offset += 1) {
+    const candidate = startPort + offset;
+    if (await isPortFree(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`No available HMR port found in range ${startPort}-${startPort + maxAttempts - 1}`);
+}
 
 function normalizeLinkedRepositories(input: unknown): ProjectRepositoryLinkRecord[] {
   if (!Array.isArray(input)) {
@@ -535,10 +561,19 @@ async function startServer() {
     res.status(200).send("Webhook received");
   });
 
+  let vite: ViteDevServer | undefined;
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const hmrPort = Number(process.env.VITE_HMR_PORT || 24679);
-    const vite = await createViteServer({
+    const configuredHmrPort = Number(process.env.VITE_HMR_PORT || 24679);
+    const hmrPort = await findAvailablePort(configuredHmrPort);
+    if (hmrPort !== configuredHmrPort) {
+      console.warn(
+        `Preferred HMR port ${configuredHmrPort} is busy. Using ${hmrPort} instead.`
+      );
+    }
+
+    vite = await createViteServer({
       server: {
         middlewareMode: true,
         hmr: {
@@ -564,6 +599,15 @@ async function startServer() {
 
   const shutdown = async (signal: string) => {
     console.log(`Received ${signal}, shutting down...`);
+
+    try {
+      if (vite) {
+        await vite.close();
+      }
+    } catch (error) {
+      console.error("Error closing Vite server:", error);
+    }
+
     try {
       await mongoConnectionManager.close();
     } catch (error) {
