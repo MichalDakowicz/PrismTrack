@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, FolderGit2, AlertCircle } from "lucide-react";
-import { Repository } from "../types";
+import { X, Plus, FolderGit2, AlertCircle, Tag, Loader2 } from "lucide-react";
+import { Repository, Label } from "../types";
 import { cn } from "../lib/utils";
+import { useProjects } from "../contexts/ProjectContext";
 
 interface CreateIssueModalProps {
   isOpen: boolean;
@@ -11,10 +12,14 @@ interface CreateIssueModalProps {
 }
 
 export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModalProps) {
+  const { activeProject } = useProjects();
   const [repos, setRepos] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
+  const [labelsLoading, setLabelsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,11 +28,43 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
       fetch("/api/github/repos")
         .then(res => res.json())
         .then(data => {
-          setRepos(data.slice(0, 20));
-          if (data.length > 0) setSelectedRepo(data[0].full_name);
+          let filteredRepos = data.slice(0, 20);
+          
+          if (activeProject && activeProject.linkedRepositories.length > 0) {
+            const linkedNames = activeProject.linkedRepositories.map(r => r.full_name);
+            filteredRepos = filteredRepos.filter((r: Repository) => linkedNames.includes(r.full_name));
+          }
+          
+          setRepos(filteredRepos);
+          if (filteredRepos.length > 0) {
+            setSelectedRepo(filteredRepos[0].full_name);
+          }
         });
     }
-  }, [isOpen]);
+  }, [isOpen, activeProject]);
+
+  useEffect(() => {
+    if (selectedRepo) {
+      setLabelsLoading(true);
+      setAvailableLabels([]);
+      setSelectedLabels([]);
+      
+      const [owner, repo] = selectedRepo.split("/");
+      fetch(`/api/github/repos/${owner}/${repo}/labels`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setAvailableLabels(data);
+          }
+        })
+        .catch(() => {
+          setAvailableLabels([]);
+        })
+        .finally(() => {
+          setLabelsLoading(false);
+        });
+    }
+  }, [selectedRepo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +76,12 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
       const res = await fetch("/api/github/issues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo: selectedRepo, title, body }),
+        body: JSON.stringify({ 
+          repo: selectedRepo, 
+          title, 
+          body,
+          labels: selectedLabels.length > 0 ? selectedLabels : undefined 
+        }),
       });
 
       if (res.ok) {
@@ -47,6 +89,7 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
         onClose();
         setTitle("");
         setBody("");
+        setSelectedLabels([]);
       } else {
         const data = await res.json();
         setError(data.error || "Failed to create issue");
@@ -56,6 +99,14 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleLabel = (labelName: string) => {
+    setSelectedLabels(prev => 
+      prev.includes(labelName) 
+        ? prev.filter(l => l !== labelName)
+        : [...prev, labelName]
+    );
   };
 
   return (
@@ -129,6 +180,41 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-mono text-[11px] uppercase text-text-dim tracking-wider flex items-center gap-2">
+                  Labels
+                  {labelsLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                </label>
+                {availableLabels.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {availableLabels.map(label => (
+                      <button
+                        key={label.id}
+                        type="button"
+                        onClick={() => toggleLabel(label.name)}
+                      className={cn(
+                        "px-2 py-1 rounded-sm text-xs font-mono border transition-all",
+                        selectedLabels.includes(label.name)
+                          ? "ring-1 ring-offset-1 ring-offset-surface ring-primary"
+                          : "opacity-70 hover:opacity-100"
+                      )}
+                      style={{ 
+                        backgroundColor: `#${label.color}20`, 
+                        borderColor: selectedLabels.includes(label.name) ? `#${label.color}` : `#${label.color}40`,
+                        color: `#${label.color}`
+                      }}
+                      >
+                        {label.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs font-mono text-text-dim italic py-2">
+                    {labelsLoading ? "Loading labels..." : "No labels defined"}
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3">

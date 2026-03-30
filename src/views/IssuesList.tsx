@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { Search, Plus, Filter, ExternalLink, CircleDot, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Filter, ExternalLink, CircleDot, CheckCircle2, XCircle, RotateCcw, Loader2, AlertCircle } from "lucide-react";
 import { motion } from "motion/react";
 import { Issue } from "../types";
 import { cn } from "../lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { CreateIssueModal } from "../components/CreateIssueModal";
 import { useProjects } from "../contexts/ProjectContext";
-import { filterIssuesByProject, hasLinkedRepositories } from "../lib/projectSelectors";
+import { filterIssuesByProject, hasLinkedRepositories, getRepositoryFullName } from "../lib/projectSelectors";
 
 export function IssuesList() {
   const { activeProject } = useProjects();
@@ -14,6 +14,8 @@ export function IssuesList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [updatingIssue, setUpdatingIssue] = useState<number | null>(null);
+  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchIssues = async () => {
     try {
@@ -32,6 +34,41 @@ export function IssuesList() {
   useEffect(() => {
     fetchIssues();
   }, []);
+
+  const showNotification = (type: "success" | "error", message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
+  const updateIssueState = async (issue: Issue, newState: "open" | "closed") => {
+    const repoFullName = issue.repository?.full_name || getRepositoryFullName(issue.repository_url);
+    if (!repoFullName) return;
+
+    const [owner, repo] = repoFullName.split("/");
+    setUpdatingIssue(issue.number);
+    
+    try {
+      const res = await fetch(`/api/github/issues/${owner}/${repo}/${issue.number}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ state: newState }),
+      });
+
+      if (res.ok) {
+        setIssues(prev => prev.map(i => 
+          i.id === issue.id ? { ...i, state: newState } : i
+        ));
+        showNotification("success", `Issue #${issue.number} ${newState === "closed" ? "closed" : "reopened"}`);
+      } else {
+        const data = await res.json();
+        showNotification("error", data.error || "Failed to update issue");
+      }
+    } catch (error) {
+      showNotification("error", "Failed to update issue");
+    } finally {
+      setUpdatingIssue(null);
+    }
+  };
 
   const scopedIssues = filterIssuesByProject(issues, activeProject);
 
@@ -63,6 +100,23 @@ export function IssuesList() {
 
   return (
     <div className="flex flex-col h-full">
+      {notification && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          className={cn(
+            "fixed top-4 right-4 z-50 px-4 py-3 rounded-sm text-sm font-mono flex items-center gap-2",
+            notification.type === "success" 
+              ? "bg-green-500/10 border border-green-500/20 text-green-400"
+              : "bg-red-500/10 border border-red-500/20 text-red-400"
+          )}
+        >
+          {notification.type === "success" ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+          {notification.message}
+        </motion.div>
+      )}
+
       <header className="shrink-0 border-b border-border bg-surface/80 backdrop-blur-md px-6 py-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -117,15 +171,17 @@ export function IssuesList() {
             {filteredIssues.map((issue) => (
               <tr 
                 key={issue.id} 
-                className="group hover:bg-surface-hover cursor-pointer transition-colors relative"
-                onClick={() => window.open(issue.html_url, "_blank")}
+                className="group hover:bg-surface-hover transition-colors relative"
               >
                 <td className="px-6 py-2.5">
                   <input type="checkbox" className="rounded-sm bg-background border-border text-primary focus:ring-primary h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </td>
                 <td className="px-4 py-2.5 font-mono text-text-dim group-hover:text-primary transition-colors">#{issue.number}</td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2">
+                  <div 
+                    className="flex items-center gap-2 cursor-pointer"
+                    onClick={() => window.open(issue.html_url, "_blank")}
+                  >
                     {issue.state === "open" ? (
                       <CircleDot className="w-4 h-4 text-primary" />
                     ) : (
@@ -135,12 +191,37 @@ export function IssuesList() {
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className={cn(
-                    "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-xs font-mono bg-surface border border-border",
-                    issue.state === "open" ? "text-primary border-primary/20" : "text-accent border-accent/20"
-                  )}>
-                    {issue.state}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-sm text-xs font-mono bg-surface border border-border",
+                      issue.state === "open" ? "text-primary border-primary/20" : "text-accent border-accent/20"
+                    )}>
+                      {issue.state}
+                    </span>
+                    {updatingIssue === issue.number ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-text-dim" />
+                    ) : (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {issue.state === "open" ? (
+                          <button
+                            onClick={() => updateIssueState(issue, "closed")}
+                            className="p-1 hover:bg-surface-hover rounded transition-colors"
+                            title="Close issue"
+                          >
+                            <XCircle className="w-4 h-4 text-text-dim hover:text-accent" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => updateIssueState(issue, "open")}
+                            className="p-1 hover:bg-surface-hover rounded transition-colors"
+                            title="Reopen issue"
+                          >
+                            <RotateCcw className="w-4 h-4 text-text-dim hover:text-primary" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">

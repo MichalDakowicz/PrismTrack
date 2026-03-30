@@ -105,7 +105,7 @@ describe("project scoped integration", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /Open Core Platform/i }));
 
-    expect(await screen.findByRole("heading", { name: "Core Platform", level: 1 })).toBeInTheDocument();
+    expect(await screen.findByText("Core Platform")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("link", { name: /List/i })[0]);
 

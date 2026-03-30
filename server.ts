@@ -1,4 +1,6 @@
 import express from "express";
+import { promises as fs } from "fs";
+import { createServer as createHttpServer, Server as HttpServer } from "http";
 import net from "net";
 import path from "path";
 import { createServer as createViteServer, ViteDevServer } from "vite";
@@ -17,7 +19,9 @@ import { ProjectRepository, validateProjectInput } from "./backend/repositories/
 
 dotenv.config();
 
-async function isPortFree(port: number, host = "127.0.0.1"): Promise<boolean> {
+const DEV_PID_FILE = path.join(process.cwd(), ".prismtrack-dev.pid");
+
+async function isPortFree(port: number, host = "0.0.0.0"): Promise<boolean> {
   return await new Promise<boolean>((resolve) => {
     const tester = net
       .createServer()
@@ -27,7 +31,7 @@ async function isPortFree(port: number, host = "127.0.0.1"): Promise<boolean> {
       .once("listening", () => {
         tester.close(() => resolve(true));
       })
-      .listen(port, host);
+      .listen({ port, host, exclusive: true });
   });
 }
 
@@ -40,6 +44,78 @@ async function findAvailablePort(startPort: number, maxAttempts = 20): Promise<n
   }
 
   throw new Error(`No available HMR port found in range ${startPort}-${startPort + maxAttempts - 1}`);
+}
+
+function isProcessRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function terminateProcessGracefully(pid: number): Promise<void> {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    return;
+  }
+
+  const timeoutMs = 5000;
+  const pollMs = 100;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!isProcessRunning(pid)) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollMs));
+  }
+
+  if (isProcessRunning(pid)) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // Ignore if the process exited after the last check.
+    }
+  }
+}
+
+async function cleanupStaleDevProcess(): Promise<void> {
+  try {
+    const content = await fs.readFile(DEV_PID_FILE, "utf8");
+    const previousPid = Number(content.trim());
+
+    if (!Number.isInteger(previousPid) || previousPid <= 0 || previousPid === process.pid) {
+      return;
+    }
+
+    if (!isProcessRunning(previousPid)) {
+      return;
+    }
+
+    console.warn(`Detected stale PrismTrack dev process (${previousPid}). Stopping it...`);
+    await terminateProcessGracefully(previousPid);
+  } catch {
+    // Ignore missing/unreadable PID file.
+  }
+}
+
+async function writeDevPidFile(): Promise<void> {
+  await fs.writeFile(DEV_PID_FILE, String(process.pid), "utf8");
+}
+
+async function removeDevPidFile(): Promise<void> {
+  try {
+    const content = await fs.readFile(DEV_PID_FILE, "utf8");
+    const current = Number(content.trim());
+    if (current !== process.pid) {
+      return;
+    }
+    await fs.unlink(DEV_PID_FILE);
+  } catch {
+    // Ignore missing/unreadable PID file.
+  }
 }
 
 function normalizeLinkedRepositories(input: unknown): ProjectRepositoryLinkRecord[] {
@@ -81,10 +157,20 @@ function normalizeLinkedRepositories(input: unknown): ProjectRepositoryLinkRecor
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
   const isProduction = process.env.NODE_ENV === "production";
   const isDevelopment = process.env.NODE_ENV !== "production";
-  const appUrl = (process.env.APP_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
+
+  if (isDevelopment) {
+    await cleanupStaleDevProcess();
+  }
+
+  const configuredPort = Number(process.env.PORT || 3000);
+  const listenPort = isDevelopment ? await findAvailablePort(configuredPort, 30) : configuredPort;
+  if (listenPort !== configuredPort) {
+    console.warn(`Preferred app port ${configuredPort} is busy. Using ${listenPort} instead.`);
+  }
+
+  const appUrl = (process.env.APP_URL || `http://localhost:${listenPort}`).replace(/\/+$/, "");
   const githubCallbackUrl =
     process.env.GITHUB_CALLBACK_URL?.trim() || `${appUrl}/api/auth/github/callback`;
   const databaseConfig = getDatabaseConfig(process.env);
@@ -523,10 +609,15 @@ async function startServer() {
     const token = req.session?.github_token;
     if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-    const { repo, title, body } = req.body;
+    const { repo, title, body, labels } = req.body;
     if (!repo || !title) return res.status(400).json({ error: "Repo and title are required" });
 
     try {
+      const requestBody: { title: string; body?: string; labels?: string[] } = { title, body };
+      if (labels && Array.isArray(labels) && labels.length > 0) {
+        requestBody.labels = labels;
+      }
+
       const response = await fetch(`https://api.github.com/repos/${repo}/issues`, {
         method: "POST",
         headers: {
@@ -534,12 +625,106 @@ async function startServer() {
           "User-Agent": "PrismTrack",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ title, body }),
+        body: JSON.stringify(requestBody),
       });
+
+      if (response.status === 403 || response.status === 404) {
+        const error = await response.json();
+        console.log("GitHub error response:", error);
+        return res.status(response.status).json({ error: error.message || error.error || `GitHub error: ${response.status}` });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to create issue" });
+      }
+
       const issue = await response.json();
       res.json(issue);
     } catch (error) {
       res.status(500).json({ error: "Failed to create issue" });
+    }
+  });
+
+  app.get("/api/github/repos/:owner/:repo/labels", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo } = req.params;
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/labels`, {
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+        },
+      });
+
+      if (response.status === 404) {
+        return res.status(404).json({ error: "Repository not found" });
+      }
+
+      if (response.status === 403) {
+        const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+        if (rateLimitRemaining === "0") {
+          return res.status(403).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+        }
+        const error = await response.json();
+        return res.status(403).json({ error: error.message || "Access forbidden" });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to fetch labels" });
+      }
+
+      const labels = await response.json();
+      res.json(labels);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch labels" });
+    }
+  });
+
+  app.patch("/api/github/issues/:owner/:repo/:issueNumber", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo, issueNumber } = req.params;
+    const { state } = req.body;
+
+    if (!state || !["open", "closed"].includes(state)) {
+      return res.status(400).json({ error: "State must be 'open' or 'closed'" });
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ state }),
+      });
+
+      if (response.status === 403) {
+        const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+        if (rateLimitRemaining === "0") {
+          return res.status(403).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+        }
+        const error = await response.json();
+        return res.status(403).json({ error: error.message || "Access forbidden" });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to update issue" });
+      }
+
+      const issue = await response.json();
+      res.json(issue);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update issue" });
     }
   });
 
@@ -561,25 +746,18 @@ async function startServer() {
     res.status(200).send("Webhook received");
   });
 
+  const server: HttpServer = createHttpServer(app);
+
   let vite: ViteDevServer | undefined;
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const configuredHmrPort = Number(process.env.VITE_HMR_PORT || 24679);
-    const hmrPort = await findAvailablePort(configuredHmrPort);
-    if (hmrPort !== configuredHmrPort) {
-      console.warn(
-        `Preferred HMR port ${configuredHmrPort} is busy. Using ${hmrPort} instead.`
-      );
-    }
-
     vite = await createViteServer({
       server: {
         middlewareMode: true,
         hmr: {
+          server,
           host: "localhost",
-          port: hmrPort,
-          clientPort: hmrPort,
         },
       },
       appType: "spa",
@@ -593,8 +771,11 @@ async function startServer() {
     });
   }
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  server.listen(listenPort, "0.0.0.0", async () => {
+    if (isDevelopment) {
+      await writeDevPidFile();
+    }
+    console.log(`Server running on http://localhost:${listenPort}`);
   });
 
   const shutdown = async (signal: string) => {
@@ -617,6 +798,11 @@ async function startServer() {
     await new Promise<void>((resolve) => {
       server.close(() => resolve());
     });
+
+    if (isDevelopment) {
+      await removeDevPidFile();
+    }
+
     process.exit(0);
   };
 

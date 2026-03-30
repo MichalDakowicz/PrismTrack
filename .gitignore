@@ -11,3 +11,5 @@ coverage/
 .github
 .kiro
 .opencode
+
+.prismtrack-dev.pid

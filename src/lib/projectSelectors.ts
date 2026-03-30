@@ -1,6 +1,6 @@
 import { Issue, Project, PullRequest } from "../types";
 
-function getRepositoryFullName(resourceUrl?: string): string | null {
+export function getRepositoryFullName(resourceUrl?: string): string | null {
   if (!resourceUrl) {
     return null;
   }
