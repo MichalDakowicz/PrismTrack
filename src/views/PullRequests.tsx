@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { PullRequest } from "../types";
 import { cn } from "../lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { SortFilterPopover, SortOption, sortItems } from "../components/SortFilterPopover";
 import { useProjects } from "../contexts/ProjectContext";
 import { filterPullRequestsByProject, hasLinkedRepositories } from "../lib/projectSelectors";
 
@@ -12,6 +13,7 @@ export function PullRequests() {
   const [prs, setPrs] = useState<PullRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
 
   useEffect(() => {
     const fetchPrs = async () => {
@@ -33,9 +35,12 @@ export function PullRequests() {
 
   const scopedPrs = filterPullRequestsByProject(prs, activeProject);
 
-  const filteredPrs = scopedPrs.filter(pr => 
-    pr.title.toLowerCase().includes(search.toLowerCase()) ||
-    pr.number.toString().includes(search)
+  const filteredPrs = sortItems(
+    scopedPrs.filter(pr => 
+      pr.title.toLowerCase().includes(search.toLowerCase()) ||
+      pr.number.toString().includes(search)
+    ),
+    sortBy
   );
 
   if (loading) {
@@ -70,10 +75,7 @@ export function PullRequests() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-surface-hover hover:bg-border border border-border rounded-sm text-sm font-mono text-text-main transition-colors">
-              <Filter className="w-4 h-4" />
-              Sort
-            </button>
+            <SortFilterPopover value={sortBy} onChange={setSortBy} />
           </div>
         </div>
 

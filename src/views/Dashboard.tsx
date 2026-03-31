@@ -9,9 +9,11 @@ import {
   filterPullRequestsByProject,
   hasLinkedRepositories,
 } from "../lib/projectSelectors";
+import { useSidebar } from "../contexts/SidebarContext";
 
 export function Dashboard() {
   const { activeProject } = useProjects();
+  const { openPanel } = useSidebar();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [prs, setPrs] = useState<PullRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +89,7 @@ export function Dashboard() {
                   key={issue.id}
                   whileHover={{ x: 4 }}
                   className="group flex items-center gap-4 p-3 bg-surface hover:bg-surface-hover border border-transparent hover:border-border cursor-pointer transition-all"
-                  onClick={() => window.open(issue.html_url, "_blank")}
+                  onClick={() => openPanel(issue)}
                 >
                   <div className="flex items-center gap-3 min-w-25">
                     <CircleDot className={cn(

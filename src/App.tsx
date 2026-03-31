@@ -17,6 +17,8 @@ import { WorkspaceSettings } from "./views/WorkspaceSettings";
 import { GitHubAppSettings } from "./views/GitHubAppSettings";
 import { MembersSettings } from "./views/MembersSettings";
 import { NotificationsSettings } from "./views/NotificationsSettings";
+import { IssueDetailPanel } from "./components/IssueDetailPanel/index";
+import { SidebarProvider } from "./contexts/SidebarContext";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -46,7 +48,7 @@ export default function App() {
   }
 
   return (
-    <>
+    <SidebarProvider>
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
@@ -78,10 +80,11 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
+      <IssueDetailPanel />
       <CommandPalette 
         isOpen={isCommandPaletteOpen} 
         onClose={() => setIsCommandPaletteOpen(false)} 
       />
-    </>
+    </SidebarProvider>
   );
 }

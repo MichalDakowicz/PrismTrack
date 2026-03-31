@@ -26,6 +26,8 @@ import { Issue } from "../types";
 import { cn } from "../lib/utils";
 import { useProjects } from "../contexts/ProjectContext";
 import { filterIssuesByProject, hasLinkedRepositories } from "../lib/projectSelectors";
+import { useSidebar } from "../contexts/SidebarContext";
+import { CreateIssueModal } from "../components/CreateIssueModal";
 
 const STATUS_LABELS = {
   backlog: "status:backlog",
@@ -42,9 +44,10 @@ interface Column {
 interface SortableIssueProps {
   issue: Issue;
   isDragging?: boolean;
+  onOpenPanel?: (issue: Issue) => void;
 }
 
-function SortableIssue({ issue, isDragging }: SortableIssueProps) {
+function SortableIssue({ issue, isDragging, onOpenPanel }: SortableIssueProps) {
   const uniqueId = `${issue.repository?.full_name || 'unknown'}-${issue.number}`;
   
   const {
@@ -64,6 +67,13 @@ function SortableIssue({ issue, isDragging }: SortableIssueProps) {
 
   const displayLabels = issue.labels.filter(l => !l.name.startsWith('status:'));
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isSortableDragging) {
+      e.stopPropagation();
+      onOpenPanel?.(issue);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -74,11 +84,7 @@ function SortableIssue({ issue, isDragging }: SortableIssueProps) {
         "bg-surface border border-border p-4 group hover:border-border-strong transition-colors cursor-grab active:cursor-grabbing touch-none",
         isDragging && "opacity-50"
       )}
-      onClick={(e) => {
-        if (!isSortableDragging) {
-          window.open(issue.html_url, "_blank");
-        }
-      }}
+      onClick={handleClick}
     >
       <div className="flex justify-between items-start mb-2">
         <span className="font-mono text-[10px] text-primary">#{issue.number}</span>
@@ -166,10 +172,14 @@ function Column({
   column,
   isOver,
   onDragOver,
+  onOpenPanel,
+  onAddIssue,
 }: {
   column: Column;
   isOver: boolean;
   onDragOver?: (over: boolean) => void;
+  onOpenPanel?: (issue: Issue) => void;
+  onAddIssue?: () => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -196,7 +206,30 @@ function Column({
             {column.issues.length}
           </span>
         </h2>
-        <MoreHorizontal className="w-4 h-4 text-text-dim" />
+        <div className="relative">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              const menu = e.currentTarget.nextElementSibling as HTMLElement;
+              menu.classList.toggle("hidden");
+            }}
+            className="p-1 hover:bg-surface-hover rounded transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4 text-text-dim" />
+          </button>
+          <div className="hidden absolute right-0 top-full mt-1 w-40 bg-surface border border-border rounded-sm shadow-xl z-50 py-1">
+            <button className="w-full px-3 py-2 text-left text-sm text-text-main hover:bg-surface-hover transition-colors">
+              Rename column
+            </button>
+            <button className="w-full px-3 py-2 text-left text-sm text-text-main hover:bg-surface-hover transition-colors">
+              Clear column
+            </button>
+            <div className="border-t border-border my-1" />
+            <button className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-surface-hover transition-colors">
+              Delete column
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto pr-2 min-h-[200px]">
@@ -213,12 +246,15 @@ function Column({
                 column.id === "in-progress" && "[&>div]:border-l-2 [&>div]:border-l-primary"
               )}
             >
-              <SortableIssue issue={issue} />
+              <SortableIssue issue={issue} onOpenPanel={onOpenPanel} />
             </motion.div>
           ))}
         </SortableContext>
 
-        <button className="w-full py-3 font-mono text-[11px] text-text-dim hover:text-primary hover:bg-surface-hover transition-all flex items-center justify-center gap-2 border border-dashed border-border">
+        <button 
+          onClick={onAddIssue}
+          className="w-full py-3 font-mono text-[11px] text-text-dim hover:text-primary hover:bg-surface-hover transition-all flex items-center justify-center gap-2 border border-dashed border-border"
+        >
           <Plus className="w-3 h-3" />
           ADD ISSUE
         </button>
@@ -229,12 +265,14 @@ function Column({
 
 export function Board() {
   const { activeProject } = useProjects();
+  const { openPanel } = useSidebar();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState<number[]>([]);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -542,6 +580,8 @@ export function Board() {
               column={col}
               isOver={overColumn === col.id}
               onDragOver={(over) => setOverColumn(over ? col.id : null)}
+              onOpenPanel={openPanel}
+              onAddIssue={() => setIsCreateModalOpen(true)}
             />
           ))}
         </div>
@@ -549,6 +589,16 @@ export function Board() {
           {activeIssue ? <IssueCard issue={activeIssue} isOverlay /> : null}
         </DragOverlay>
       </DndContext>
+      
+      <CreateIssueModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        onSuccess={() => {
+          fetch("/api/github/issues")
+            .then(res => res.json())
+            .then(data => setIssues(data));
+        }}
+      />
     </div>
   );
 }

@@ -20,9 +20,11 @@ import { cn } from "../lib/utils";
 import { useProjects } from "../contexts/ProjectContext";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { UserProfileMenu } from "./UserProfileMenu";
+import { useFilterPresets, FILTER_PRESETS } from "../hooks/useFilterPresets";
 
 export function Sidebar() {
   const { activeProject } = useProjects();
+  const { isActive, toggleFilter } = useFilterPresets();
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/" },
@@ -154,14 +156,21 @@ export function Sidebar() {
             Custom Filters
           </h3>
           <div className="space-y-1">
-            <button className="flex items-center gap-2 w-full text-[13px] text-text-dim hover:text-text-main group transition-colors px-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500 opacity-70 group-hover:opacity-100" />
-              <span>My Bugs</span>
-            </button>
-            <button className="flex items-center gap-2 w-full text-[13px] text-text-dim hover:text-text-main group transition-colors px-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-orange-500 opacity-70 group-hover:opacity-100" />
-              <span>Urgent</span>
-            </button>
+            {FILTER_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => toggleFilter(preset.id)}
+                className={cn(
+                  "flex items-center gap-2 w-full text-[13px] group transition-colors px-1 rounded-sm",
+                  isActive(preset.id) 
+                    ? "text-text-main bg-surface-hover" 
+                    : "text-text-dim hover:text-text-main"
+                )}
+              >
+                <div className={cn("w-1.5 h-1.5 rounded-full transition-opacity", preset.color, isActive(preset.id) ? "opacity-100" : "opacity-70 group-hover:opacity-100")} />
+                <span>{preset.label}</span>
+              </button>
+            ))}
           </div>
         </div>
       </nav>

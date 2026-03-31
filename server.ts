@@ -690,11 +690,20 @@ async function startServer() {
     if (!token) return res.status(401).json({ error: "Not authenticated" });
 
     const { owner, repo, issueNumber } = req.params;
-    const { state } = req.body;
+    const { state, title, body } = req.body;
 
-    if (!state || !["open", "closed"].includes(state)) {
+    if (!state && !title && body === undefined) {
+      return res.status(400).json({ error: "At least one field (state, title, or body) is required" });
+    }
+
+    if (state && !["open", "closed"].includes(state)) {
       return res.status(400).json({ error: "State must be 'open' or 'closed'" });
     }
+
+    const updateData: Record<string, unknown> = {};
+    if (state) updateData.state = state;
+    if (title !== undefined) updateData.title = title;
+    if (body !== undefined) updateData.body = body;
 
     try {
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
@@ -704,7 +713,7 @@ async function startServer() {
           "User-Agent": "PrismTrack",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ state }),
+        body: JSON.stringify(updateData),
       });
 
       if (response.status === 403) {

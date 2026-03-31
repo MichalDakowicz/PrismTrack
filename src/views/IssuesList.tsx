@@ -5,14 +5,20 @@ import { Issue } from "../types";
 import { cn } from "../lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { CreateIssueModal } from "../components/CreateIssueModal";
+import { SortFilterPopover, SortOption, sortItems } from "../components/SortFilterPopover";
 import { useProjects } from "../contexts/ProjectContext";
 import { filterIssuesByProject, hasLinkedRepositories, getRepositoryFullName } from "../lib/projectSelectors";
+import { useSidebar } from "../contexts/SidebarContext";
+import { useFilterPresets, FILTER_PRESETS } from "../hooks/useFilterPresets";
 
 export function IssuesList() {
   const { activeProject } = useProjects();
+  const { openPanel } = useSidebar();
+  const { activeFilter } = useFilterPresets();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [updatingIssue, setUpdatingIssue] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -72,9 +78,20 @@ export function IssuesList() {
 
   const scopedIssues = filterIssuesByProject(issues, activeProject);
 
-  const filteredIssues = scopedIssues.filter(issue => 
-    issue.title.toLowerCase().includes(search.toLowerCase()) ||
-    issue.number.toString().includes(search)
+  const activePreset = FILTER_PRESETS.find(p => p.id === activeFilter);
+
+  const filteredIssues = sortItems(
+    scopedIssues.filter(issue => {
+      const matchesSearch = 
+        issue.title.toLowerCase().includes(search.toLowerCase()) ||
+        issue.number.toString().includes(search);
+      
+      if (!activePreset) return matchesSearch;
+      
+      const matchesFilter = issue.labels.some(label => activePreset.filter(label.name));
+      return matchesSearch && matchesFilter;
+    }),
+    sortBy
   );
 
   if (loading) {
@@ -126,10 +143,7 @@ export function IssuesList() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-3 py-1.5 bg-surface-hover hover:bg-border border border-border rounded-sm text-sm font-mono text-text-main transition-colors">
-              <Filter className="w-4 h-4" />
-              Sort
-            </button>
+            <SortFilterPopover value={sortBy} onChange={setSortBy} />
             <button 
               onClick={() => setIsCreateModalOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 bg-primary hover:bg-primary/90 text-on-primary rounded-sm text-sm font-mono uppercase tracking-wide transition-colors"
@@ -180,7 +194,7 @@ export function IssuesList() {
                 <td className="px-4 py-2.5">
                   <div 
                     className="flex items-center gap-2 cursor-pointer"
-                    onClick={() => window.open(issue.html_url, "_blank")}
+                    onClick={() => openPanel(issue)}
                   >
                     {issue.state === "open" ? (
                       <CircleDot className="w-4 h-4 text-primary" />
