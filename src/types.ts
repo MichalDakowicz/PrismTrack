@@ -49,6 +49,8 @@ export interface Repository {
   owner: User;
   private: boolean;
   html_url: string;
+  stargazers_count?: number;
+  forks_count?: number;
 }
 
 export type ProjectStatus = "planned" | "active" | "archived";

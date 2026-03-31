@@ -10,7 +10,11 @@ import {
   CalendarRange,
   Activity,
   Signal,
-  Settings2
+  Settings2,
+  Users,
+  Bell,
+  Github,
+  Building2
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useProjects } from "../contexts/ProjectContext";
@@ -90,6 +94,62 @@ export function Sidebar() {
           ))}
 
         <div className="pt-8 px-3">
+          <h3 className="font-mono text-[11px] uppercase tracking-wider text-text-dim mb-3">
+            Settings
+          </h3>
+          <div className="space-y-0.5">
+            <NavLink
+              to="/settings/workspace"
+              className={({ isActive }) => cn(
+                "flex items-center gap-2 px-2 py-1 rounded-sm transition-all",
+                isActive 
+                  ? "bg-surface-hover text-primary" 
+                  : "text-text-dim hover:text-text-main hover:bg-surface-hover"
+              )}
+            >
+              <Building2 className="w-4 h-4" />
+              <span className="text-[13px]">Workspace</span>
+            </NavLink>
+            <NavLink
+              to="/settings/github-app"
+              className={({ isActive }) => cn(
+                "flex items-center gap-2 px-2 py-1 rounded-sm transition-all",
+                isActive 
+                  ? "bg-surface-hover text-primary" 
+                  : "text-text-dim hover:text-text-main hover:bg-surface-hover"
+              )}
+            >
+              <Github className="w-4 h-4" />
+              <span className="text-[13px]">GitHub App</span>
+            </NavLink>
+            <NavLink
+              to="/settings/members"
+              className={({ isActive }) => cn(
+                "flex items-center gap-2 px-2 py-1 rounded-sm transition-all",
+                isActive 
+                  ? "bg-surface-hover text-primary" 
+                  : "text-text-dim hover:text-text-main hover:bg-surface-hover"
+              )}
+            >
+              <Users className="w-4 h-4" />
+              <span className="text-[13px]">Members</span>
+            </NavLink>
+            <NavLink
+              to="/settings/notifications"
+              className={({ isActive }) => cn(
+                "flex items-center gap-2 px-2 py-1 rounded-sm transition-all",
+                isActive 
+                  ? "bg-surface-hover text-primary" 
+                  : "text-text-dim hover:text-text-main hover:bg-surface-hover"
+              )}
+            >
+              <Bell className="w-4 h-4" />
+              <span className="text-[13px]">Notifications</span>
+            </NavLink>
+          </div>
+        </div>
+
+        <div className="pt-4 px-3">
           <h3 className="font-mono text-[11px] uppercase tracking-wider text-text-dim mb-3">
             Custom Filters
           </h3>

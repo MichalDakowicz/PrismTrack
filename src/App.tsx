@@ -12,6 +12,11 @@ import { Projects } from "./views/Projects";
 import { ProjectDetail } from "./views/ProjectDetail";
 import { Branches } from "./views/Branches";
 import { WorkspaceSectionPlaceholder } from "./views/WorkspaceSectionPlaceholder";
+import { Repositories } from "./views/Repositories";
+import { WorkspaceSettings } from "./views/WorkspaceSettings";
+import { GitHubAppSettings } from "./views/GitHubAppSettings";
+import { MembersSettings } from "./views/MembersSettings";
+import { NotificationsSettings } from "./views/NotificationsSettings";
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -50,25 +55,22 @@ export default function App() {
           <Route path="/board" element={<Board />} />
           <Route path="/pull-requests" element={<PullRequests />} />
           <Route path="/branches" element={<Branches />} />
-          <Route
-            path="/repositories"
-            element={<WorkspaceSectionPlaceholder title="Repositories" description="Workspace repository management and linking controls will appear here." />}
-          />
+          <Route path="/repositories" element={<Repositories />} />
           <Route
             path="/settings/workspace"
-            element={<WorkspaceSectionPlaceholder title="Workspace Settings" description="Workspace identity, slug, and avatar controls will appear here." />}
+            element={<WorkspaceSettings />}
           />
           <Route
             path="/settings/github-app"
-            element={<WorkspaceSectionPlaceholder title="GitHub App" description="Installation status and repository permissions will appear here." />}
+            element={<GitHubAppSettings installed={true} />}
           />
           <Route
             path="/settings/members"
-            element={<WorkspaceSectionPlaceholder title="Members" description="Member roles, invitations, and access management will appear here." />}
+            element={<MembersSettings />}
           />
           <Route
             path="/settings/notifications"
-            element={<WorkspaceSectionPlaceholder title="Notifications" description="Notification channels and user notification preferences will appear here." />}
+            element={<NotificationsSettings />}
           />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:projectId" element={<Navigate to="board" replace />} />

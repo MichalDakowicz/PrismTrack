@@ -1,9 +1,10 @@
-import { Project, Repository } from "../types";
+import { Project, Repository, ProjectRepositoryLink } from "../types";
 
 export interface ProjectCreateInput {
   name: string;
   description?: string;
   repositoryIds?: number[];
+  linkedRepositories?: ProjectRepositoryLink[];
 }
 
 export interface ProjectUpdateInput {
@@ -11,6 +12,7 @@ export interface ProjectUpdateInput {
   description?: string;
   status?: Project["status"];
   repositoryIds?: number[];
+  linkedRepositories?: ProjectRepositoryLink[];
 }
 
 export interface ProjectService {
@@ -44,7 +46,9 @@ export function createInMemoryProjectService(repositories: Repository[]): Projec
     },
 
     async createProject(input) {
-      const selectedRepos = mapRepositoryIdsToLinks(input, repositories);
+      const selectedRepos = input.linkedRepositories 
+        ? input.linkedRepositories 
+        : mapRepositoryIdsToLinks(input, repositories);
 
       const project: Project = {
         id: `project-${Math.random().toString(36).slice(2, 10)}`,
@@ -61,9 +65,11 @@ export function createInMemoryProjectService(repositories: Repository[]): Projec
     },
 
     async updateProject(projectId, input) {
-      const selectedRepos = input.repositoryIds
-        ? mapRepositoryIdsToLinks(input, repositories)
-        : undefined;
+      const selectedRepos = input.linkedRepositories 
+        ? input.linkedRepositories 
+        : input.repositoryIds
+          ? mapRepositoryIdsToLinks(input, repositories)
+          : undefined;
 
       let updatedProject: Project | null = null;
       projects = projects.map((project) => {
@@ -111,13 +117,17 @@ export function createApiProjectService(repositories: Repository[]): ProjectServ
     },
 
     async createProject(input) {
+      const selectedRepos = input.linkedRepositories 
+        ? input.linkedRepositories 
+        : mapRepositoryIdsToLinks(input, repositories);
+
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: input.name,
           description: input.description,
-          linkedRepositories: mapRepositoryIdsToLinks(input, repositories),
+          linkedRepositories: selectedRepos,
         }),
       });
 
@@ -135,7 +145,9 @@ export function createApiProjectService(repositories: Repository[]): ProjectServ
         status: input.status,
       };
 
-      if (input.repositoryIds !== undefined) {
+      if (input.linkedRepositories !== undefined) {
+        payload.linkedRepositories = input.linkedRepositories;
+      } else if (input.repositoryIds !== undefined) {
         payload.linkedRepositories = mapRepositoryIdsToLinks(input, repositories);
       }
 
