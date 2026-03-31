@@ -40,6 +40,13 @@ export function Dashboard() {
     };
 
     fetchData();
+    
+    // Set up polling to refresh data every 5 seconds for live updates
+    const pollInterval = setInterval(() => {
+      fetchData();
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const scopedIssues = filterIssuesByProject(issues, activeProject);

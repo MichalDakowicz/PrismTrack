@@ -254,6 +254,29 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
         }
     }, [selectedIssue, repoFullName, availableLabels, onStateChange, showNotification]);
 
+    const deleteIssue = useCallback(async () => {
+        if (!selectedIssue || !repoFullName) return;
+        const [owner, repo] = repoFullName.split("/");
+        setUpdatingStatus(true);
+
+        try {
+            const res = await fetch(`/api/github/issues/${owner}/${repo}/${selectedIssue.number}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+            });
+            if (res.ok) {
+                showNotification("success", "Issue deleted");
+                closePanel();
+            } else {
+                showNotification("error", "Failed to delete issue");
+            }
+        } catch {
+            showNotification("error", "Failed to delete issue");
+        } finally {
+            setUpdatingStatus(false);
+        }
+    }, [selectedIssue, repoFullName, showNotification, closePanel]);
+
     return {
         isOpen,
         selectedIssue,
@@ -289,5 +312,6 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
         updateBody,
         toggleLabel,
         updateStatus,
+        deleteIssue,
     };
 }

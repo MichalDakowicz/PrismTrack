@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
-import { X, Plus, FolderGit2, AlertCircle, Tag, Loader2 } from "lucide-react";
-import { Repository, Label } from "../types";
+import { X, Plus, FolderGit2, AlertCircle, Tag, Loader2, User } from "lucide-react";
+import { Repository, Label, User as UserType } from "../types";
 import { cn } from "../lib/utils";
 import { useProjects } from "../contexts/ProjectContext";
 
@@ -20,6 +21,9 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
   const [labelsLoading, setLabelsLoading] = useState(false);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [availableAssignees, setAvailableAssignees] = useState<UserType[]>([]);
+  const [assigneesLoading, setAssigneesLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,20 +52,31 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
       setLabelsLoading(true);
       setAvailableLabels([]);
       setSelectedLabels([]);
+      setAssigneesLoading(true);
+      setAvailableAssignees([]);
+      setSelectedAssignees([]);
       
       const [owner, repo] = selectedRepo.split("/");
-      fetch(`/api/github/repos/${owner}/${repo}/labels`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) {
-            setAvailableLabels(data);
+      Promise.all([
+        fetch(`/api/github/repos/${owner}/${repo}/labels`),
+        fetch(`/api/github/repos/${owner}/${repo}/assignees`)
+      ])
+        .then(([labelsRes, assigneesRes]) => Promise.all([labelsRes.json(), assigneesRes.json()]))
+        .then(([labelsData, assigneesData]) => {
+          if (Array.isArray(labelsData)) {
+            setAvailableLabels(labelsData);
+          }
+          if (Array.isArray(assigneesData)) {
+            setAvailableAssignees(assigneesData);
           }
         })
         .catch(() => {
           setAvailableLabels([]);
+          setAvailableAssignees([]);
         })
         .finally(() => {
           setLabelsLoading(false);
+          setAssigneesLoading(false);
         });
     }
   }, [selectedRepo]);
@@ -80,7 +95,8 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
           repo: selectedRepo, 
           title, 
           body,
-          labels: selectedLabels.length > 0 ? selectedLabels : undefined 
+          labels: selectedLabels.length > 0 ? selectedLabels : undefined,
+          assignees: selectedAssignees.length > 0 ? selectedAssignees : undefined 
         }),
       });
 
@@ -90,6 +106,7 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
         setTitle("");
         setBody("");
         setSelectedLabels([]);
+        setSelectedAssignees([]);
       } else {
         const data = await res.json();
         setError(data.error || "Failed to create issue");
@@ -109,7 +126,15 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
     );
   };
 
-  return (
+  const toggleAssignee = (username: string) => {
+    setSelectedAssignees(prev => 
+      prev.includes(username) 
+        ? prev.filter(a => a !== username)
+        : [...prev, username]
+    );
+  };
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -118,13 +143,13 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[110]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9600]"
           />
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[520px] bg-surface border border-border shadow-2xl z-[111] rounded-sm overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[520px] bg-surface border border-border shadow-2xl z-[9601] rounded-sm overflow-hidden"
           >
             <div className="flex items-center justify-between p-4 border-b border-border bg-background">
               <h2 className="text-sm font-mono font-bold uppercase tracking-widest text-text-main flex items-center gap-2">
@@ -217,6 +242,41 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
                 )}
               </div>
 
+              <div className="space-y-2">
+                <label className="font-mono text-[11px] uppercase text-text-dim tracking-wider flex items-center gap-2">
+                  Assignees
+                  {assigneesLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                </label>
+                {availableAssignees.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {availableAssignees.map(user => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => toggleAssignee(user.login)}
+                        className={cn(
+                          "px-2 py-1 rounded-sm text-xs font-mono border transition-all flex items-center gap-1.5",
+                          selectedAssignees.includes(user.login)
+                            ? "ring-1 ring-offset-1 ring-offset-surface ring-primary"
+                            : "opacity-70 hover:opacity-100"
+                        )}
+                      >
+                        {user.avatar_url ? (
+                          <img src={user.avatar_url} alt="" className="w-4 h-4 rounded-full" />
+                        ) : (
+                          <User className="w-4 h-4" />
+                        )}
+                        {user.login}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs font-mono text-text-dim italic py-2">
+                    {assigneesLoading ? "Loading assignees..." : "No assignees available"}
+                  </div>
+                )}
+              </div>
+
               <div className="pt-4 flex items-center justify-end gap-3">
                 <button 
                   type="button"
@@ -242,6 +302,7 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }

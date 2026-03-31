@@ -1,6 +1,8 @@
 import { motion, AnimatePresence } from "motion/react";
-import { X, ExternalLink, Calendar, User, Tag } from "lucide-react";
+import { X, ExternalLink, Calendar, User, Tag, Users, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Issue } from "../../types";
 import { useIssueDetailPanel } from "./useIssueDetailPanel";
 import { StatusPicker } from "./StatusPicker";
@@ -8,6 +10,8 @@ import { LabelPicker } from "./LabelPicker";
 import { EditableTitle } from "./EditableTitle";
 import { EditableDescription } from "./EditableDescription";
 import { Notification } from "./Notification";
+import { ConfirmModal } from "../ConfirmModal";
+import { useAuth } from "../../contexts/AuthContext";
 
 interface IssueDetailPanelProps {
     onStateChange?: (issue: Issue) => void;
@@ -15,6 +19,9 @@ interface IssueDetailPanelProps {
 
 export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
     const hook = useIssueDetailPanel({ onStateChange });
+    const { user } = useAuth();
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const {
         isOpen,
@@ -53,12 +60,12 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
         updateStatus,
     } = hook;
 
-    if (!isOpen || !selectedIssue) return null;
+    const canDeleteIssue = user && selectedIssue && selectedIssue.repository && user.login === selectedIssue.repository.owner.login;
 
     const handleTitleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter") updateTitle();
         if (e.key === "Escape") {
-            setEditTitle(selectedIssue.title);
+            setEditTitle(selectedIssue!.title);
             setIsEditingTitle(false);
         }
     };
@@ -68,24 +75,28 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
         setIsEditingBody(false);
     };
 
-    return (
+    return createPortal(
         <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={closePanel}
-                className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[120]"
-            />
-            <motion.div
-                ref={panelRef}
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                style={{ width: panelWidth, minWidth: panelWidth }}
-                className="fixed right-0 top-0 bottom-0 bg-surface border-l border-border shadow-2xl z-[121] flex flex-col"
-            >
+            {isOpen && selectedIssue && (
+                <>
+                    <motion.div
+                        key="backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={closePanel}
+                        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[9000]"
+                    />
+                    <motion.div
+                        key="panel"
+                        ref={panelRef}
+                        initial={{ x: "100%" }}
+                        animate={{ x: 0 }}
+                        exit={{ x: "100%" }}
+                        transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                        style={{ width: panelWidth, minWidth: panelWidth }}
+                        className="fixed right-0 top-0 bottom-0 bg-surface border-l border-border shadow-2xl z-[9001] flex flex-col"
+                    >
                 <div
                     onMouseDown={(e) => {
                         e.preventDefault();
@@ -117,6 +128,15 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         >
                             <ExternalLink className="w-4 h-4" />
                         </a>
+                        {canDeleteIssue && (
+                            <button 
+                                onClick={() => setDeleteConfirmOpen(true)}
+                                className="p-2 text-text-dim hover:text-red-400 transition-colors"
+                                title="Delete issue"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
+                        )}
                         <button onClick={closePanel} className="p-2 text-text-dim hover:text-text-main transition-colors">
                             <X className="w-5 h-5" />
                         </button>
@@ -179,6 +199,35 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         </div>
                     </div>
 
+                    {(selectedIssue.assignees || []).length > 0 && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-text-dim" />
+                                <span className="text-xs text-text-dim">Assignees</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 pl-6">
+                                {selectedIssue.assignees.map((assignee) => (
+                                    <div
+                                        key={assignee.id}
+                                        className="flex items-center gap-2 px-2 py-1 bg-surface-hover rounded-sm border border-border"
+                                    >
+                                        {assignee.avatar_url ? (
+                                            <img
+                                                src={assignee.avatar_url}
+                                                alt={assignee.login}
+                                                className="w-5 h-5 rounded-full"
+                                                referrerPolicy="no-referrer"
+                                            />
+                                        ) : (
+                                            <User className="w-5 h-5 text-text-dim" />
+                                        )}
+                                        <span className="text-sm text-text-main">{assignee.login}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -235,6 +284,28 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                     </div>
                 </div>
             </motion.div>
-        </AnimatePresence>
+            <ConfirmModal
+                isOpen={deleteConfirmOpen}
+                title="Delete Issue"
+                message={`Are you sure you want to delete issue #${selectedIssue.number}? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                isDangerous={true}
+                isLoading={isDeleting}
+                onConfirm={async () => {
+                    setIsDeleting(true);
+                    try {
+                        await hook.deleteIssue();
+                        setDeleteConfirmOpen(false);
+                    } finally {
+                        setIsDeleting(false);
+                    }
+                }}
+                onCancel={() => setDeleteConfirmOpen(false)}
+            />
+                </>
+            )}
+        </AnimatePresence>,
+        document.body
     );
 }

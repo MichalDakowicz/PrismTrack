@@ -609,13 +609,16 @@ async function startServer() {
     const token = req.session?.github_token;
     if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-    const { repo, title, body, labels } = req.body;
+    const { repo, title, body, labels, assignees } = req.body;
     if (!repo || !title) return res.status(400).json({ error: "Repo and title are required" });
 
     try {
-      const requestBody: { title: string; body?: string; labels?: string[] } = { title, body };
+      const requestBody: { title: string; body?: string; labels?: string[]; assignees?: string[] } = { title, body };
       if (labels && Array.isArray(labels) && labels.length > 0) {
         requestBody.labels = labels;
+      }
+      if (assignees && Array.isArray(assignees) && assignees.length > 0) {
+        requestBody.assignees = assignees;
       }
 
       const response = await fetch(`https://api.github.com/repos/${repo}/issues`, {
@@ -682,6 +685,45 @@ async function startServer() {
       res.json(labels);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch labels" });
+    }
+  });
+
+  app.get("/api/github/repos/:owner/:repo/assignees", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo } = req.params;
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/assignees`, {
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+        },
+      });
+
+      if (response.status === 404) {
+        return res.status(404).json({ error: "Repository not found" });
+      }
+
+      if (response.status === 403) {
+        const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+        if (rateLimitRemaining === "0") {
+          return res.status(403).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+        }
+        const error = await response.json();
+        return res.status(403).json({ error: error.message || "Access forbidden" });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to fetch assignees" });
+      }
+
+      const assignees = await response.json();
+      res.json(assignees);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignees" });
     }
   });
 
@@ -777,6 +819,153 @@ async function startServer() {
       res.json(issue);
     } catch (error) {
       res.status(500).json({ error: "Failed to update labels" });
+    }
+  });
+
+  app.post("/api/github/repos/:owner/:repo/issues/:issueNumber/assignees", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo, issueNumber } = req.params;
+    const { assignees } = req.body;
+
+    if (!assignees || !Array.isArray(assignees)) {
+      return res.status(400).json({ error: "Assignees must be an array" });
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/assignees`, {
+        method: "POST",
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ assignees }),
+      });
+
+      if (response.status === 403) {
+        const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+        if (rateLimitRemaining === "0") {
+          return res.status(403).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+        }
+        const error = await response.json();
+        return res.status(403).json({ error: error.message || "Access forbidden" });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to add assignees" });
+      }
+
+      const issue = await response.json();
+      res.json(issue);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add assignees" });
+    }
+  });
+
+  app.delete("/api/github/repos/:owner/:repo/issues/:issueNumber/assignees", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo, issueNumber } = req.params;
+    const { assignees } = req.body;
+
+    if (!assignees || !Array.isArray(assignees)) {
+      return res.status(400).json({ error: "Assignees must be an array" });
+    }
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/assignees`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ assignees }),
+      });
+
+      if (response.status === 403) {
+        const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+        if (rateLimitRemaining === "0") {
+          return res.status(403).json({ error: "GitHub API rate limit exceeded. Please try again later." });
+        }
+        const error = await response.json();
+        return res.status(403).json({ error: error.message || "Access forbidden" });
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        return res.status(response.status).json({ error: error.message || "Failed to remove assignees" });
+      }
+
+      const issue = await response.json();
+      res.json(issue);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove assignees" });
+    }
+  });
+
+  app.delete("/api/github/issues/:owner/:repo/:issueNumber", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { owner, repo, issueNumber } = req.params;
+
+    try {
+      // First, get the issue to find its ID
+      const getIssueResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
+        headers: {
+          Authorization: `token ${token}`,
+          "User-Agent": "PrismTrack",
+        },
+      });
+
+      if (!getIssueResponse.ok) {
+        const error = await getIssueResponse.json();
+        return res.status(getIssueResponse.status).json({ error: error.message || "Failed to fetch issue" });
+      }
+
+      const issue = await getIssueResponse.json();
+
+      // Use GraphQL API to delete the issue
+      const deleteResponse = await fetch("https://api.github.com/graphql", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "User-Agent": "PrismTrack",
+        },
+        body: JSON.stringify({
+          query: `
+            mutation DeleteIssue($issueId: ID!) {
+              deleteIssue(input: { issueId: $issueId }) {
+                clientMutationId
+              }
+            }
+          `,
+          variables: {
+            issueId: issue.node_id,
+          },
+        }),
+      });
+
+      const deleteData = await deleteResponse.json();
+
+      if (deleteData.errors) {
+        const errorMessage = deleteData.errors[0]?.message || "Failed to delete issue";
+        // Check if it's a permission issue
+        if (errorMessage.includes("not allowed") || errorMessage.includes("admin")) {
+          return res.status(403).json({ error: "You need admin permissions to delete issues. Only repository admins can delete issues." });
+        }
+        return res.status(403).json({ error: errorMessage });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete issue" });
     }
   });
 

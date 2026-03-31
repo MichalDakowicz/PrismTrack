@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { MoreHorizontal, Plus, CircleDot, CheckCircle2, AlertCircle } from "lucide-react";
+import { MoreHorizontal, Plus, CircleDot, CheckCircle2, AlertCircle, User } from "lucide-react";
 import { motion } from "motion/react";
 import {
   DndContext,
@@ -111,12 +111,42 @@ function SortableIssue({ issue, isDragging, onOpenPanel }: SortableIssueProps) {
             </span>
           ))}
         </div>
-        <img
-          src={issue.user.avatar_url}
-          alt={issue.user.login}
-          className="w-5 h-5 rounded-full border border-border"
-          referrerPolicy="no-referrer"
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center -space-x-1">
+            {(issue.assignees || []).slice(0, 3).map((assignee) => (
+              assignee.avatar_url ? (
+                <img
+                  key={assignee.id}
+                  src={assignee.avatar_url}
+                  alt={assignee.login}
+                  className="w-5 h-5 rounded-full border border-border"
+                  referrerPolicy="no-referrer"
+                  title={`Assignee: ${assignee.login}`}
+                />
+              ) : (
+                <div
+                  key={assignee.id}
+                  className="w-5 h-5 rounded-full border border-border bg-surface-hover flex items-center justify-center"
+                  title={`Assignee: ${assignee.login}`}
+                >
+                  <User className="w-3 h-3 text-text-dim" />
+                </div>
+              )
+            ))}
+            {(issue.assignees || []).length === 0 && (
+              <span className="text-[10px] text-text-dim italic">Unassigned</span>
+            )}
+          </div>
+          {issue.user && (
+            <img
+              src={issue.user.avatar_url}
+              alt={issue.user.login}
+              className="w-5 h-5 rounded-full border border-border"
+              referrerPolicy="no-referrer"
+              title={`Author: ${issue.user.login}`}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -157,12 +187,42 @@ function IssueCard({ issue, isOverlay }: { issue: Issue; isOverlay?: boolean }) 
             </span>
           ))}
         </div>
-        <img
-          src={issue.user.avatar_url}
-          alt={issue.user.login}
-          className="w-5 h-5 rounded-full border border-border"
-          referrerPolicy="no-referrer"
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center -space-x-1">
+            {(issue.assignees || []).slice(0, 3).map((assignee) => (
+              assignee.avatar_url ? (
+                <img
+                  key={assignee.id}
+                  src={assignee.avatar_url}
+                  alt={assignee.login}
+                  className="w-5 h-5 rounded-full border border-border"
+                  referrerPolicy="no-referrer"
+                  title={`Assignee: ${assignee.login}`}
+                />
+              ) : (
+                <div
+                  key={assignee.id}
+                  className="w-5 h-5 rounded-full border border-border bg-surface-hover flex items-center justify-center"
+                  title={`Assignee: ${assignee.login}`}
+                >
+                  <User className="w-3 h-3 text-text-dim" />
+                </div>
+              )
+            ))}
+            {(issue.assignees || []).length === 0 && (
+              <span className="text-[10px] text-text-dim italic">Unassigned</span>
+            )}
+          </div>
+          {issue.user && (
+            <img
+              src={issue.user.avatar_url}
+              alt={issue.user.login}
+              className="w-5 h-5 rounded-full border border-border"
+              referrerPolicy="no-referrer"
+              title={`Author: ${issue.user.login}`}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -332,6 +392,13 @@ export function Board() {
     };
 
     fetchIssues();
+    
+    // Set up polling to refresh issues every 5 seconds for live updates
+    const pollInterval = setInterval(() => {
+      fetchIssues();
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
   }, []);
 
   const columns: Column[] = [

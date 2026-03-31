@@ -104,13 +104,13 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-100"
+            className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9500]"
           />
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="fixed left-1/2 top-[20%] -translate-x-1/2 w-full max-w-160 bg-surface border border-border shadow-2xl z-101 overflow-hidden rounded-sm"
+            className="fixed left-1/2 top-[20%] -translate-x-1/2 w-full max-w-160 bg-surface border border-border shadow-2xl z-[9501] overflow-hidden rounded-sm"
           >
             <div className="p-3 border-b border-border">
               <div className="flex items-center h-12 bg-background rounded-sm px-3 focus-within:ring-1 focus-within:ring-primary transition-all">

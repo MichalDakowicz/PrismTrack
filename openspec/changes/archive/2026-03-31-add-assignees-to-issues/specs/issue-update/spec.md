@@ -1,8 +1,5 @@
-# issue-update Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-issues. Update Purpose after archive.
-## Requirements
 ### Requirement: User can close an open issue
 The system SHALL allow users to close (resolve) an open issue from the IssuesList UI.
 

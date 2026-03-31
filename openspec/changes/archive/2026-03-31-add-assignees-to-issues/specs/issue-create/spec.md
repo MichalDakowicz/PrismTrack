@@ -1,8 +1,5 @@
-# issue-create Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change add-issues. Update Purpose after archive.
-## Requirements
 ### Requirement: User can create issue with labels
 The system SHALL allow users to create GitHub issues with optional labels directly from the CreateIssueModal UI.
 
