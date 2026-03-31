@@ -12,12 +12,14 @@ import { filterIssuesByProject, hasLinkedRepositories, getRepositoryFullName } f
 import { useSidebar } from "../contexts/SidebarContext";
 import { useFilterPresets, FILTER_PRESETS } from "../hooks/useFilterPresets";
 import { useAuth } from "../contexts/AuthContext";
+import { usePopups } from "../hooks/usePopups";
 
 export function IssuesList() {
   const { activeProject } = useProjects();
   const { openPanel } = useSidebar();
   const { activeFilter } = useFilterPresets();
   const { user } = useAuth();
+  const popups = usePopups();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -195,15 +197,15 @@ export function IssuesList() {
 
       if (res.ok) {
         setIssues(prev => prev.filter(i => i.id !== issue.id));
-        showNotification("success", `Issue #${issue.number} deleted`);
+        popups.success("Deleted", `Issue #${issue.number} deleted successfully`);
         setDeleteConfirmOpen(false);
         setIssueToDelete(null);
       } else {
         const data = await res.json();
-        showNotification("error", data.error || "Failed to delete issue");
+        popups.error("Delete Failed", data.error || "Failed to delete issue");
       }
     } catch (error) {
-      showNotification("error", "Failed to delete issue");
+      popups.error("Error", "Failed to delete issue");
     } finally {
       setIsDeleting(false);
     }
@@ -551,6 +553,7 @@ export function IssuesList() {
           setIssueToDelete(null);
         }}
       />
+
     </div>
   );
 }
