@@ -88,3 +88,12 @@ export interface Branch {
   pullRequest?: { number: number; state: string; url: string };
   repository: { full_name: string; name: string };
 }
+
+export interface BranchCommitHistoryItem {
+  sha: string;
+  message: string;
+  url: string;
+  authorLogin: string;
+  authorAvatarUrl: string;
+  committedAt: string;
+}

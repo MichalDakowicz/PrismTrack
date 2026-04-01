@@ -6,6 +6,7 @@ import { cn } from "../lib/utils";
 import { formatDistanceToNow, differenceInDays } from "date-fns";
 import { useProjects } from "../contexts/ProjectContext";
 import { hasLinkedRepositories } from "../lib/projectSelectors";
+import { BranchDetailSidebar } from "../components/BranchDetailSidebar";
 
 const STALE_THRESHOLD_DAYS = 14;
 const CACHE_KEY = "prismtrack_branches_cache";
@@ -24,6 +25,7 @@ export function Branches() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -111,6 +113,20 @@ export function Branches() {
     fetchBranches(false);
   }, [activeProject]);
 
+  useEffect(() => {
+    if (!selectedBranch) return;
+
+    const stillExists = branches.some(
+      (branch) =>
+        branch.name === selectedBranch.name &&
+        branch.repository.full_name === selectedBranch.repository.full_name
+    );
+
+    if (!stillExists) {
+      setSelectedBranch(branches.length > 0 ? branches[0] : null);
+    }
+  }, [branches, selectedBranch]);
+
   const uniqueRepos = [...new Map(branches.map((b) => [b.repository.full_name, b.repository])).values()];
   const uniqueAuthors = [...new Set(branches.map((b) => b.author.login))].sort();
 
@@ -158,6 +174,10 @@ export function Branches() {
     setStatusFilter("all");
     setPrFilter("all");
     setSelectedRepo("all");
+  };
+
+  const handleSelectBranch = (branch: Branch) => {
+    setSelectedBranch(branch);
   };
 
   const hasActiveFilters = search || statusFilter !== "all" || prFilter !== "all" || selectedRepo !== "all";
@@ -265,8 +285,9 @@ export function Branches() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-left border-collapse whitespace-nowrap">
+      <div className="relative flex flex-1 overflow-hidden">
+        <div className="h-full flex-1 overflow-auto">
+          <table className="w-full text-left border-collapse whitespace-nowrap">
           <thead className="sticky top-0 bg-surface/95 backdrop-blur-sm z-10 border-b border-border text-[11px] font-mono text-text-dim uppercase tracking-wider">
             <tr>
               <th className="px-6 py-3 font-normal w-12">
@@ -279,20 +300,31 @@ export function Branches() {
               <th className="px-4 py-3 font-normal w-24">PR</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border text-sm">
+            <tbody className="divide-y divide-border text-sm">
             {filteredBranches.map((branch) => {
               const commitDate = new Date(branch.lastCommitDate);
               const daysSinceCommit = differenceInDays(new Date(), commitDate);
               const isStale = daysSinceCommit >= STALE_THRESHOLD_DAYS;
+              const isSelected =
+                selectedBranch?.name === branch.name &&
+                selectedBranch?.repository.full_name === branch.repository.full_name;
 
               return (
                 <tr
                   key={`${branch.repository.full_name}:${branch.name}`}
                   className={cn(
                     "group hover:bg-surface-hover cursor-pointer transition-colors",
+                    isSelected && "bg-primary/10",
                     isStale && "bg-accent/5"
                   )}
-                  onClick={() => window.open(`https://github.com/${branch.repository.full_name}/tree/${branch.name}`, "_blank")}
+                  onClick={() => handleSelectBranch(branch)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleSelectBranch(branch);
+                    }
+                  }}
+                  tabIndex={0}
                 >
                   <td className="px-6 py-3">
                     <input type="checkbox" className="rounded-sm bg-background border-border text-primary focus:ring-primary h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -375,21 +407,33 @@ export function Branches() {
                 </tr>
               );
             })}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
 
-        {filteredBranches.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-20 text-text-dim">
-            <GitBranch className="w-12 h-12 mb-4 opacity-20" />
-            <p className="font-mono text-sm">No branches found</p>
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="mt-2 text-xs text-primary hover:underline"
-              >
-                Clear filters
-              </button>
-            )}
+          {filteredBranches.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-20 text-text-dim">
+              <GitBranch className="w-12 h-12 mb-4 opacity-20" />
+              <p className="font-mono text-sm">No branches found</p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="mt-2 text-xs text-primary hover:underline"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {selectedBranch ? (
+          <BranchDetailSidebar branch={selectedBranch} />
+        ) : (
+          <div className="hidden md:flex h-full w-[24rem] shrink-0 border-l border-border bg-surface p-4">
+            <div className="m-auto flex max-w-xs flex-col items-center text-center text-text-dim">
+              <GitBranch className="mb-3 h-10 w-10 opacity-30" />
+              <p className="text-sm font-mono">Select a branch to view details</p>
+            </div>
           </div>
         )}
       </div>

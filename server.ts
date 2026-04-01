@@ -605,6 +605,52 @@ async function startServer() {
     res.json(allBranches);
   });
 
+  app.get("/api/github/branch-commits", async (req, res) => {
+    const token = req.session?.github_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const { repo, branch } = req.query;
+    if (!repo || !branch || typeof repo !== "string" || typeof branch !== "string") {
+      return res.status(400).json({ error: "Repository and branch are required" });
+    }
+
+    try {
+      const commitsResponse = await fetch(
+        `https://api.github.com/repos/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=8`,
+        {
+          headers: {
+            Authorization: `token ${token}`,
+            "User-Agent": "PrismTrack",
+          },
+        }
+      );
+
+      if (!commitsResponse.ok) {
+        const error = await commitsResponse.json().catch(() => ({}));
+        return res
+          .status(commitsResponse.status)
+          .json({ error: (error as { message?: string }).message || "Failed to fetch branch commits" });
+      }
+
+      const commits = await commitsResponse.json();
+      const normalized = Array.isArray(commits)
+        ? commits.map((commit: any) => ({
+            sha: commit.sha,
+            message: commit.commit?.message?.split("\n")[0] || "No commit message",
+            url: commit.html_url,
+            authorLogin: commit.author?.login || commit.commit?.author?.name || "unknown",
+            authorAvatarUrl: commit.author?.avatar_url || "",
+            committedAt: commit.commit?.author?.date || new Date().toISOString(),
+          }))
+        : [];
+
+      res.json(normalized);
+    } catch (error) {
+      console.error(`Error fetching commits for ${repo}:${branch}:`, error);
+      res.status(500).json({ error: "Failed to fetch branch commits" });
+    }
+  });
+
   app.post("/api/github/issues", async (req, res) => {
     const token = req.session?.github_token;
     if (!token) return res.status(401).json({ error: "Not authenticated" });

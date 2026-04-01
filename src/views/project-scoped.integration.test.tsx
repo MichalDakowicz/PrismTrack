@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "../App";
 import { ProjectProvider } from "../contexts/ProjectContext";
+import { PopupProvider } from "../contexts/PopupContext";
 
 vi.mock("../contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -96,7 +97,9 @@ describe("project scoped integration", () => {
     render(
       <MemoryRouter initialEntries={["/projects"]}>
         <ProjectProvider>
-          <App />
+          <PopupProvider>
+            <App />
+          </PopupProvider>
         </ProjectProvider>
       </MemoryRouter>
     );
@@ -148,7 +151,9 @@ describe("project scoped integration", () => {
     render(
       <MemoryRouter initialEntries={["/projects/project-core-platform/board"]}>
         <ProjectProvider>
-          <App />
+          <PopupProvider>
+            <App />
+          </PopupProvider>
         </ProjectProvider>
       </MemoryRouter>
     );
