@@ -38,7 +38,7 @@ export function PopupRenderer() {
   }, []);
 
   const getStyles = (type: PopupConfig["type"]) => {
-    const baseStyles = "border border-border bg-surface shadow-lg rounded-sm p-4 flex items-start gap-3";
+    const baseStyles = "w-[min(460px,calc(100vw-1.5rem))] border border-border/80 bg-surface/95 backdrop-blur-sm shadow-2xl rounded-md p-4 flex items-start gap-3";
     const typeStyles = {
       info: "border-blue-500/30 bg-blue-500/5",
       success: "border-green-500/30 bg-green-500/5",
@@ -68,14 +68,22 @@ export function PopupRenderer() {
   if (!portalElement) return null;
 
   return createPortal(
-    <AnimatePresence mode="popLayout">
-      <div className="fixed bottom-6 right-6 flex flex-col gap-2 pointer-events-none">
+    <AnimatePresence initial={false} mode="popLayout">
+      <div className="fixed bottom-6 right-4 sm:right-6 flex flex-col-reverse gap-3 pointer-events-none">
         {popups.map((popup) => (
           <motion.div
             key={popup.id}
-            initial={{ opacity: 0, y: 20, x: 20 }}
-            animate={{ opacity: 1, y: 0, x: 0 }}
-            exit={{ opacity: 0, y: 20, x: 20 }}
+            layout
+            initial={{ opacity: 0, y: 42, scale: 0.97, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: 56, scale: 0.96, filter: "blur(3px)" }}
+            transition={{
+              layout: { duration: 0.22, ease: "easeOut" },
+              type: "spring",
+              stiffness: 300,
+              damping: 24,
+              mass: 0.75,
+            }}
             className="pointer-events-auto"
           >
             <div className={getStyles(popup.type)}>

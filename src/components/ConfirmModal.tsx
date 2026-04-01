@@ -40,14 +40,14 @@ export function ConfirmModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onCancel}
-            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[9998]"
+            className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-9998"
           />
           <motion.div
             key="modal"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[400px] bg-surface border border-border shadow-2xl z-[9999] rounded-sm overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-100 bg-surface border border-border shadow-2xl z-9999 rounded-sm overflow-hidden"
           >
             <div className="flex items-center justify-between p-4 border-b border-border bg-background">
               <div className="flex items-center gap-2">

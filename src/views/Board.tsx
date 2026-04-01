@@ -292,7 +292,7 @@ function Column({
         </div>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto pr-2 min-h-[200px]">
+      <div className="flex-1 space-y-3 overflow-y-auto pr-2 min-h-50">
         <SortableContext
           items={column.issues.map((i) => `${i.repository?.full_name || 'unknown'}-${i.number}`)}
           strategy={verticalListSortingStrategy}

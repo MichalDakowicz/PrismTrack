@@ -85,7 +85,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={closePanel}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[9000]"
+                        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-9000"
                     />
                     <motion.div
                         key="panel"
@@ -95,7 +95,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         exit={{ x: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
                         style={{ width: panelWidth, minWidth: panelWidth }}
-                        className="fixed right-0 top-0 bottom-0 bg-surface border-l border-border shadow-2xl z-[9001] flex flex-col"
+                        className="fixed right-0 top-0 bottom-0 bg-surface border-l border-border shadow-2xl z-9001 flex flex-col"
                     >
                 <div
                     onMouseDown={(e) => {

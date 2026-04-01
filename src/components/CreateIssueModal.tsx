@@ -143,13 +143,13 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9600]"
+            className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-9600"
           />
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[520px] bg-surface border border-border shadow-2xl z-[9601] rounded-sm overflow-hidden"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-130 bg-surface border border-border shadow-2xl z-9601 rounded-sm overflow-hidden"
           >
             <div className="flex items-center justify-between p-4 border-b border-border bg-background">
               <h2 className="text-sm font-mono font-bold uppercase tracking-widest text-text-main flex items-center gap-2">
@@ -200,7 +200,7 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
               <div className="space-y-2">
                 <label className="font-mono text-[11px] uppercase text-text-dim tracking-wider">Description (Optional)</label>
                 <textarea 
-                  className="w-full bg-surface-well border border-border rounded-sm py-2 px-3 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary min-h-[120px] transition-all resize-none"
+                  className="w-full bg-surface-well border border-border rounded-sm py-2 px-3 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary min-h-30 transition-all resize-none"
                   placeholder="Describe the issue..."
                   value={body}
                   onChange={(e) => setBody(e.target.value)}

@@ -476,8 +476,8 @@ export function IssuesList() {
       />
 
       {managingAssigneesFor !== null && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-[9700] flex items-center justify-center">
-          <div className="bg-surface border border-border rounded-sm shadow-2xl w-full max-w-[300px] max-h-[400px] overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-[2px] z-9700 flex items-center justify-center">
+          <div className="bg-surface border border-border rounded-sm shadow-2xl w-full max-w-75 max-h-100 overflow-hidden">
             <div className="flex items-center justify-between p-3 border-b border-border">
               <h3 className="text-sm font-mono font-bold uppercase tracking-widest text-text-main">
                 Assignees
@@ -489,7 +489,7 @@ export function IssuesList() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="p-2 overflow-auto max-h-[320px]">
+            <div className="p-2 overflow-auto max-h-80">
               {assigneesLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-5 h-5 animate-spin text-text-dim" />

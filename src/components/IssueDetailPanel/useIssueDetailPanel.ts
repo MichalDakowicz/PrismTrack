@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Issue, Label } from "../../types";
 import { useSidebar } from "../../contexts/SidebarContext";
 import { getRepositoryFullName } from "../../lib/projectSelectors";
+import { usePopups } from "../../hooks/usePopups";
 
 export const STATUS_LABELS = {
     backlog: "status:backlog",
@@ -17,6 +18,7 @@ interface UseIssueDetailPanelOptions {
 
 export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOptions = {}) {
     const { isOpen, selectedIssue, closePanel } = useSidebar();
+    const popups = usePopups();
     const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
     const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
     const [labelsLoading, setLabelsLoading] = useState(false);
@@ -265,17 +267,17 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
                 headers: { "Content-Type": "application/json" },
             });
             if (res.ok) {
-                showNotification("success", "Issue deleted");
+                popups.success("Issue deleted", `Issue #${selectedIssue.number} was deleted.`);
                 closePanel();
             } else {
-                showNotification("error", "Failed to delete issue");
+                popups.error("Delete failed", "Failed to delete issue.");
             }
         } catch {
-            showNotification("error", "Failed to delete issue");
+            popups.error("Delete failed", "Failed to delete issue.");
         } finally {
             setUpdatingStatus(false);
         }
-    }, [selectedIssue, repoFullName, showNotification, closePanel]);
+    }, [selectedIssue, repoFullName, popups, closePanel]);
 
     return {
         isOpen,
