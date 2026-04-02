@@ -1,4 +1,4 @@
-export interface DatabaseConfig {
+export interface PostgresConfig {
   host: string;
   port: number;
   database: string;
@@ -9,6 +9,17 @@ export interface DatabaseConfig {
   connectionTimeoutMillis?: number;
   useInMemoryProjectRepo: boolean;
   allowInMemoryProjectRepoFallback: boolean;
+}
+
+function parseNumber(value: string | undefined, defaultValue: number): number {
+  if (!value) {
+    return defaultValue;
+  }
+  const parsed = Number(value);
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return defaultValue;
+  }
+  return parsed;
 }
 
 function parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
@@ -26,18 +37,7 @@ function parseBoolean(value: string | undefined, defaultValue: boolean): boolean
   return defaultValue;
 }
 
-function parseNumber(value: string | undefined, defaultValue: number): number {
-  if (!value) {
-    return defaultValue;
-  }
-  const parsed = Number(value);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    return defaultValue;
-  }
-  return parsed;
-}
-
-export function getDatabaseConfig(env: NodeJS.ProcessEnv = process.env): DatabaseConfig {
+export function getPostgresConfig(env: NodeJS.ProcessEnv = process.env): PostgresConfig {
   return {
     host: env.DB_HOST || "",
     port: parseNumber(env.DB_PORT, 5432),
@@ -55,7 +55,7 @@ export function getDatabaseConfig(env: NodeJS.ProcessEnv = process.env): Databas
   };
 }
 
-export function validateDatabaseConfig(config: DatabaseConfig): string[] {
+export function validatePostgresConfig(config: PostgresConfig): string[] {
   const errors: string[] = [];
 
   if (!config.useInMemoryProjectRepo && !config.host.trim()) {
@@ -66,8 +66,8 @@ export function validateDatabaseConfig(config: DatabaseConfig): string[] {
     errors.push("DB_USER is required unless USE_IN_MEMORY_PROJECT_REPO=true.");
   }
 
-  if (!config.database.trim()) {
-    errors.push("DB_NAME is required.");
+  if (!config.useInMemoryProjectRepo && !config.database.trim()) {
+    errors.push("DB_NAME is required unless USE_IN_MEMORY_PROJECT_REPO=true.");
   }
 
   if (config.port <= 0 || config.port > 65535) {
@@ -77,11 +77,11 @@ export function validateDatabaseConfig(config: DatabaseConfig): string[] {
   return errors;
 }
 
-export function assertDatabaseConfig(
-  config: DatabaseConfig,
+export function assertPostgresConfig(
+  config: PostgresConfig,
   options: { isProduction: boolean }
 ): void {
-  const errors = validateDatabaseConfig(config);
+  const errors = validatePostgresConfig(config);
   if (errors.length === 0) {
     return;
   }

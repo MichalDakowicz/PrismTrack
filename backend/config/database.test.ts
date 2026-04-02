@@ -4,33 +4,39 @@ import { assertDatabaseConfig, getDatabaseConfig, validateDatabaseConfig } from 
 describe("database config", () => {
   it("parses values and defaults", () => {
     const config = getDatabaseConfig({
-      MONGODB_URI: "mongodb://localhost:27017",
-      MONGODB_DB_NAME: "prismtrack-dev",
+      DB_HOST: "localhost",
+      DB_PORT: "5432",
+      DB_NAME: "prismtrack-dev",
+      DB_USER: "testuser",
+      DB_PASSWORD: "testpass",
       USE_IN_MEMORY_PROJECT_REPO: "false",
       ALLOW_IN_MEMORY_PROJECT_REPO_FALLBACK: "true",
       NODE_ENV: "development",
     });
 
-    expect(config.uri).toBe("mongodb://localhost:27017");
-    expect(config.dbName).toBe("prismtrack-dev");
+    expect(config.host).toBe("localhost");
+    expect(config.port).toBe(5432);
+    expect(config.database).toBe("prismtrack-dev");
+    expect(config.user).toBe("testuser");
+    expect(config.password).toBe("testpass");
     expect(config.useInMemoryProjectRepo).toBe(false);
     expect(config.allowInMemoryProjectRepoFallback).toBe(true);
-    expect(config.connectTimeoutMS).toBe(10_000);
+    expect(config.max).toBe(10);
   });
 
-  it("validates missing URI when not using in-memory mode", () => {
+  it("validates missing host when not using in-memory mode", () => {
     const config = getDatabaseConfig({
-      MONGODB_DB_NAME: "prismtrack",
+      DB_NAME: "prismtrack",
       NODE_ENV: "production",
     });
 
     const errors = validateDatabaseConfig(config);
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0]).toContain("MONGODB_URI");
+    expect(errors[0]).toContain("DB_HOST");
   });
 
   it("throws in production on invalid config", () => {
-    const config = getDatabaseConfig({ MONGODB_DB_NAME: "prismtrack" });
+    const config = getDatabaseConfig({ DB_NAME: "prismtrack" });
     expect(() => assertDatabaseConfig(config, { isProduction: true })).toThrow();
   });
 });

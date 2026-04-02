@@ -7,14 +7,14 @@ import { createServer as createViteServer, ViteDevServer } from "vite";
 import cookieSession from "cookie-session";
 import dotenv from "dotenv";
 import { assertDatabaseConfig, getDatabaseConfig } from "./backend/config/database";
-import { createMongoConnectionManager } from "./backend/db/mongoConnection";
+import { createPostgresConnectionManager } from "./backend/db/postgresConnection";
 import {
   CreateProjectInput,
   ProjectRepositoryLinkRecord,
   UpdateProjectInput,
 } from "./backend/models/projectPersistence";
 import { InMemoryProjectRepository } from "./backend/repositories/inMemoryProjectRepository";
-import { MongoProjectRepository } from "./backend/repositories/mongoProjectRepository";
+import { PostgresProjectRepository } from "./backend/repositories/postgresProjectRepository";
 import { ProjectRepository, validateProjectInput } from "./backend/repositories/projectRepository";
 import {
   composeIssueBodyWithMetadata,
@@ -182,8 +182,8 @@ async function startServer() {
   assertDatabaseConfig(databaseConfig, { isProduction });
 
   let projectRepository: ProjectRepository;
-  const mongoConnectionManager = createMongoConnectionManager(databaseConfig);
-  let repositoryMode: "mongodb" | "in-memory" = "in-memory";
+  const postgresConnectionManager = createPostgresConnectionManager(databaseConfig);
+  let repositoryMode: "postgres" | "in-memory" = "in-memory";
 
   if (databaseConfig.useInMemoryProjectRepo) {
     projectRepository = new InMemoryProjectRepository();
@@ -191,23 +191,26 @@ async function startServer() {
     console.warn("Using in-memory project repository due to USE_IN_MEMORY_PROJECT_REPO=true");
   } else {
     try {
-      projectRepository = new MongoProjectRepository(() => mongoConnectionManager.connect());
+      // Connect to PostgreSQL first to initialize the pool
+      await postgresConnectionManager.connect();
+      
+      projectRepository = new PostgresProjectRepository(() => postgresConnectionManager.getPool());
       await projectRepository.ensureIndexes();
-      repositoryMode = "mongodb";
-      console.log(`MongoDB connected: ${databaseConfig.dbName}`);
+      repositoryMode = "postgres";
+      console.log(`PostgreSQL connected: ${databaseConfig.database}`);
     } catch (error) {
       const canFallback = databaseConfig.allowInMemoryProjectRepoFallback || isDevelopment;
       if (!canFallback || !isDevelopment) {
         throw error;
       }
 
-      console.error("MongoDB bootstrap failed, falling back to in-memory project repository", error);
+      console.error("PostgreSQL bootstrap failed, falling back to in-memory project repository", error);
       projectRepository = new InMemoryProjectRepository();
       repositoryMode = "in-memory";
     }
   }
 
-  await projectRepository.ensureIndexes();
+  // ensureIndexes for in-memory repository if needed (no-op for in-memory)
 
   app.use(express.json());
   app.set("trust proxy", 1);
@@ -318,12 +321,12 @@ async function startServer() {
   });
 
   app.get("/api/health", async (req, res) => {
-    const dbHealthy = repositoryMode === "mongodb" ? await mongoConnectionManager.ping() : true;
+    const dbHealthy = repositoryMode === "postgres" ? await postgresConnectionManager.ping() : true;
     res.status(dbHealthy ? 200 : 503).json({
       status: dbHealthy ? "ok" : "degraded",
       repositoryMode,
       database: {
-        connected: repositoryMode === "mongodb" ? mongoConnectionManager.isConnected() : false,
+        connected: repositoryMode === "postgres" ? postgresConnectionManager.isConnected() : false,
         healthy: dbHealthy,
       },
     });
@@ -1144,9 +1147,9 @@ async function startServer() {
     }
 
     try {
-      await mongoConnectionManager.close();
+      await postgresConnectionManager.close();
     } catch (error) {
-      console.error("Error closing MongoDB connection:", error);
+      console.error("Error closing PostgreSQL connection:", error);
     }
 
     await new Promise<void>((resolve) => {
