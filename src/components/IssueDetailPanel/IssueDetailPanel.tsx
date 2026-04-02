@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "motion/react";
-import { X, ExternalLink, Calendar, User, Tag, Users, Trash2 } from "lucide-react";
+import { X, ExternalLink, Calendar, User, Tag, Users, Trash2, Loader2, Save } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { createPortal } from "react-dom";
@@ -44,8 +44,15 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
         setEditTitle,
         editBody,
         setEditBody,
+        roadmapStartDate,
+        setRoadmapStartDate,
+        roadmapEndDate,
+        setRoadmapEndDate,
+        roadmapDueDate,
+        setRoadmapDueDate,
         updatingTitle,
         updatingBody,
+        updatingRoadmapDates,
         panelWidth,
         isResizing,
         setIsResizing,
@@ -56,6 +63,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
         getCurrentStatusLabel,
         updateTitle,
         updateBody,
+        updateRoadmapDates,
         toggleLabel,
         updateStatus,
     } = hook;
@@ -85,7 +93,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={closePanel}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-9000"
+                        className="fixed inset-0 bg-black/50 backdrop-blur-[2px] z-9000"
                     />
                     <motion.div
                         key="panel"
@@ -95,7 +103,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         exit={{ x: "100%" }}
                         transition={{ type: "spring", damping: 25, stiffness: 300 }}
                         style={{ width: panelWidth, minWidth: panelWidth }}
-                        className="fixed right-0 top-0 bottom-0 bg-surface border-l border-border shadow-2xl z-9001 flex flex-col"
+                        className="fixed right-0 top-0 bottom-0 bg-surface-well border-l border-border shadow-2xl z-9001 flex flex-col"
                     >
                 <div
                     onMouseDown={(e) => {
@@ -105,9 +113,11 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                     className="absolute left-0 top-0 bottom-0 w-1 cursor-ew-resize hover:bg-primary/30 active:bg-primary/50 transition-colors z-10"
                 />
 
-                <div className="flex items-center justify-between p-4 border-b border-border bg-background shrink-0">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-well shrink-0">
                     <div className="flex items-center gap-3">
-                        <span className="font-mono text-xs text-text-dim">#{selectedIssue.number}</span>
+                        <span className="font-mono text-xs text-primary tracking-tight">
+                            {selectedIssue.repository?.full_name || "issue"}#{selectedIssue.number}
+                        </span>
                         <StatusPicker
                             issue={selectedIssue}
                             getCurrentStatusLabel={getCurrentStatusLabel}
@@ -145,7 +155,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
 
                 {notification && <Notification notification={notification} />}
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto px-8 py-6 space-y-7">
                     <div>
                         <EditableTitle
                             title={editTitle}
@@ -268,7 +278,7 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                         )}
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 border-t border-border pt-6">
                         <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-text-dim" />
                             <span className="text-xs text-text-dim">Timeline</span>
@@ -279,6 +289,49 @@ export function IssueDetailPanel({ onStateChange }: IssueDetailPanelProps) {
                             </div>
                             <div className="text-text-dim">
                                 Updated {formatDistanceToNow(new Date(selectedIssue.updated_at), { addSuffix: true })}
+                            </div>
+                        </div>
+
+                        <div className="pl-6 pt-2 space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <label className="text-[11px] font-mono text-text-dim uppercase tracking-wide">
+                                    Start
+                                    <input
+                                        type="date"
+                                        className="mt-1 w-full bg-surface-well border border-border rounded-sm py-1.5 px-2 text-sm text-text-main focus:outline-none focus:border-primary"
+                                        value={roadmapStartDate}
+                                        onChange={(e) => setRoadmapStartDate(e.target.value)}
+                                    />
+                                </label>
+                                <label className="text-[11px] font-mono text-text-dim uppercase tracking-wide">
+                                    End
+                                    <input
+                                        type="date"
+                                        className="mt-1 w-full bg-surface-well border border-border rounded-sm py-1.5 px-2 text-sm text-text-main focus:outline-none focus:border-primary"
+                                        value={roadmapEndDate}
+                                        onChange={(e) => setRoadmapEndDate(e.target.value)}
+                                    />
+                                </label>
+                                <label className="text-[11px] font-mono text-text-dim uppercase tracking-wide">
+                                    Deadline
+                                    <input
+                                        type="date"
+                                        className="mt-1 w-full bg-surface-well border border-border rounded-sm py-1.5 px-2 text-sm text-text-main focus:outline-none focus:border-primary"
+                                        value={roadmapDueDate}
+                                        onChange={(e) => setRoadmapDueDate(e.target.value)}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="flex justify-end">
+                                <button
+                                    onClick={updateRoadmapDates}
+                                    disabled={updatingRoadmapDates}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-on-primary text-xs font-mono rounded-sm hover:bg-primary/90 disabled:opacity-50"
+                                >
+                                    {updatingRoadmapDates ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                    Save Roadmap Dates
+                                </button>
                             </div>
                         </div>
                     </div>

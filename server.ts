@@ -16,6 +16,11 @@ import {
 import { InMemoryProjectRepository } from "./backend/repositories/inMemoryProjectRepository";
 import { MongoProjectRepository } from "./backend/repositories/mongoProjectRepository";
 import { ProjectRepository, validateProjectInput } from "./backend/repositories/projectRepository";
+import {
+  composeIssueBodyWithMetadata,
+  extractIssueDateMetadata,
+  IssueDateMetadata,
+} from "./src/lib/issueMetadata";
 
 dotenv.config();
 
@@ -488,7 +493,18 @@ async function startServer() {
       const issues = await response.json();
       // Filter out pull requests as GitHub API returns them in issues endpoint
       const filteredIssues = Array.isArray(issues) ? issues.filter((i: any) => !i.pull_request) : issues;
-      res.json(filteredIssues);
+      const hydratedIssues = Array.isArray(filteredIssues)
+        ? filteredIssues.map((issue: any) => {
+            const { cleanBody, metadata } = extractIssueDateMetadata(issue.body);
+            return {
+              ...issue,
+              body: cleanBody,
+              prismtrackDates: metadata,
+            };
+          })
+        : filteredIssues;
+
+      res.json(hydratedIssues);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch issues" });
     }
@@ -655,11 +671,15 @@ async function startServer() {
     const token = req.session?.github_token;
     if (!token) return res.status(401).json({ error: "Not authenticated" });
 
-    const { repo, title, body, labels, assignees } = req.body;
+    const { repo, title, body, labels, assignees, startDate, endDate, dueDate } = req.body;
     if (!repo || !title) return res.status(400).json({ error: "Repo and title are required" });
 
     try {
-      const requestBody: { title: string; body?: string; labels?: string[]; assignees?: string[] } = { title, body };
+      const metadata: IssueDateMetadata = { startDate, endDate, dueDate };
+      const requestBody: { title: string; body?: string; labels?: string[]; assignees?: string[] } = {
+        title,
+        body: composeIssueBodyWithMetadata(body, metadata),
+      };
       if (labels && Array.isArray(labels) && labels.length > 0) {
         requestBody.labels = labels;
       }
@@ -689,7 +709,12 @@ async function startServer() {
       }
 
       const issue = await response.json();
-      res.json(issue);
+      const { cleanBody, metadata: parsedMetadata } = extractIssueDateMetadata(issue.body);
+      res.json({
+        ...issue,
+        body: cleanBody,
+        prismtrackDates: parsedMetadata,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to create issue" });
     }
@@ -778,10 +803,16 @@ async function startServer() {
     if (!token) return res.status(401).json({ error: "Not authenticated" });
 
     const { owner, repo, issueNumber } = req.params;
-    const { state, title, body } = req.body;
+    const { state, title, body, startDate, endDate, dueDate } = req.body;
+    const hasDateField =
+      Object.prototype.hasOwnProperty.call(req.body, "startDate") ||
+      Object.prototype.hasOwnProperty.call(req.body, "endDate") ||
+      Object.prototype.hasOwnProperty.call(req.body, "dueDate");
 
-    if (!state && !title && body === undefined) {
-      return res.status(400).json({ error: "At least one field (state, title, or body) is required" });
+    if (!state && !title && body === undefined && !hasDateField) {
+      return res
+        .status(400)
+        .json({ error: "At least one field (state, title, body, or dates) is required" });
     }
 
     if (state && !["open", "closed"].includes(state)) {
@@ -791,9 +822,40 @@ async function startServer() {
     const updateData: Record<string, unknown> = {};
     if (state) updateData.state = state;
     if (title !== undefined) updateData.title = title;
-    if (body !== undefined) updateData.body = body;
 
     try {
+      if (body !== undefined || hasDateField) {
+        const currentIssueResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
+          headers: {
+            Authorization: `token ${token}`,
+            "User-Agent": "PrismTrack",
+          },
+        });
+
+        if (!currentIssueResponse.ok) {
+          const currentIssueError = await currentIssueResponse.json();
+          return res
+            .status(currentIssueResponse.status)
+            .json({ error: currentIssueError.message || "Failed to load issue before update" });
+        }
+
+        const currentIssue = await currentIssueResponse.json();
+        const { cleanBody, metadata: existingMetadata } = extractIssueDateMetadata(currentIssue.body);
+        const nextMetadata: IssueDateMetadata = {
+          startDate: Object.prototype.hasOwnProperty.call(req.body, "startDate")
+            ? startDate || undefined
+            : existingMetadata.startDate,
+          endDate: Object.prototype.hasOwnProperty.call(req.body, "endDate")
+            ? endDate || undefined
+            : existingMetadata.endDate,
+          dueDate: Object.prototype.hasOwnProperty.call(req.body, "dueDate")
+            ? dueDate || undefined
+            : existingMetadata.dueDate,
+        };
+
+        updateData.body = composeIssueBodyWithMetadata(body !== undefined ? body : cleanBody, nextMetadata);
+      }
+
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}`, {
         method: "PATCH",
         headers: {
@@ -819,7 +881,12 @@ async function startServer() {
       }
 
       const issue = await response.json();
-      res.json(issue);
+      const { cleanBody, metadata: parsedMetadata } = extractIssueDateMetadata(issue.body);
+      res.json({
+        ...issue,
+        body: cleanBody,
+        prismtrackDates: parsedMetadata,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to update issue" });
     }

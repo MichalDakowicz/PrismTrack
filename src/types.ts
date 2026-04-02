@@ -16,9 +16,18 @@ export interface Issue {
   assignees: User[];
   created_at: string;
   updated_at: string;
+  closed_at?: string | null;
   html_url: string;
   repository_url?: string;
   repository?: Repository;
+  milestone?: {
+    due_on?: string | null;
+  } | null;
+  prismtrackDates?: {
+    startDate?: string;
+    endDate?: string;
+    dueDate?: string;
+  };
   pull_request?: any;
 }
 
@@ -37,6 +46,7 @@ export interface PullRequest {
   user: User;
   created_at: string;
   updated_at: string;
+  closed_at?: string | null;
   merged_at: string | null;
   html_url: string;
   repository_url?: string;

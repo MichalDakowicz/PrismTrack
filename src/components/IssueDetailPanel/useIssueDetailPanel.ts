@@ -30,9 +30,13 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
     const [isEditingBody, setIsEditingBody] = useState(false);
     const [editTitle, setEditTitle] = useState("");
     const [editBody, setEditBody] = useState("");
+    const [roadmapStartDate, setRoadmapStartDate] = useState("");
+    const [roadmapEndDate, setRoadmapEndDate] = useState("");
+    const [roadmapDueDate, setRoadmapDueDate] = useState("");
     const [updatingTitle, setUpdatingTitle] = useState(false);
     const [updatingBody, setUpdatingBody] = useState(false);
-    const [panelWidth, setPanelWidth] = useState(480);
+    const [updatingRoadmapDates, setUpdatingRoadmapDates] = useState(false);
+    const [panelWidth, setPanelWidth] = useState(600);
     const [isResizing, setIsResizing] = useState(false);
     const labelPickerRef = useRef<HTMLDivElement>(null);
     const statusPickerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +51,9 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
         if (selectedIssue) {
             setEditTitle(selectedIssue.title);
             setEditBody(selectedIssue.body || "");
+            setRoadmapStartDate(selectedIssue.prismtrackDates?.startDate || "");
+            setRoadmapEndDate(selectedIssue.prismtrackDates?.endDate || "");
+            setRoadmapDueDate(selectedIssue.prismtrackDates?.dueDate || "");
         }
     }, [selectedIssue?.id]);
 
@@ -171,7 +178,7 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
                 body: JSON.stringify({ body: editBody }),
             });
             if (res.ok) {
-                const updatedIssue = { ...selectedIssue, body: editBody };
+                const updatedIssue = await res.json();
                 showNotification("success", "Description updated");
                 onStateChange?.(updatedIssue);
                 setIsEditingBody(false);
@@ -184,6 +191,36 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
             setUpdatingBody(false);
         }
     }, [selectedIssue, repoFullName, editBody, onStateChange, showNotification]);
+
+    const updateRoadmapDates = useCallback(async () => {
+        if (!selectedIssue || !repoFullName) return;
+        const [owner, repo] = repoFullName.split("/");
+        setUpdatingRoadmapDates(true);
+
+        try {
+            const res = await fetch(`/api/github/issues/${owner}/${repo}/${selectedIssue.number}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    startDate: roadmapStartDate || "",
+                    endDate: roadmapEndDate || "",
+                    dueDate: roadmapDueDate || "",
+                }),
+            });
+
+            if (res.ok) {
+                const updatedIssue = await res.json();
+                showNotification("success", "Roadmap dates updated");
+                onStateChange?.(updatedIssue);
+            } else {
+                showNotification("error", "Failed to update roadmap dates");
+            }
+        } catch {
+            showNotification("error", "Failed to update roadmap dates");
+        } finally {
+            setUpdatingRoadmapDates(false);
+        }
+    }, [selectedIssue, repoFullName, roadmapStartDate, roadmapEndDate, roadmapDueDate, onStateChange, showNotification]);
 
     const updateLabels = useCallback(async (labelNames: string[]) => {
         if (!selectedIssue || !repoFullName) return;
@@ -300,8 +337,15 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
         setEditTitle,
         editBody,
         setEditBody,
+        roadmapStartDate,
+        setRoadmapStartDate,
+        roadmapEndDate,
+        setRoadmapEndDate,
+        roadmapDueDate,
+        setRoadmapDueDate,
         updatingTitle,
         updatingBody,
+        updatingRoadmapDates,
         panelWidth,
         isResizing,
         setIsResizing,
@@ -312,6 +356,7 @@ export function useIssueDetailPanel({ onStateChange }: UseIssueDetailPanelOption
         getCurrentStatusLabel,
         updateTitle,
         updateBody,
+        updateRoadmapDates,
         toggleLabel,
         updateStatus,
         deleteIssue,

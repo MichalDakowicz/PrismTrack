@@ -18,6 +18,9 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
   const [selectedRepo, setSelectedRepo] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
   const [labelsLoading, setLabelsLoading] = useState(false);
@@ -95,6 +98,9 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
           repo: selectedRepo, 
           title, 
           body,
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
+          dueDate: dueDate || undefined,
           labels: selectedLabels.length > 0 ? selectedLabels : undefined,
           assignees: selectedAssignees.length > 0 ? selectedAssignees : undefined 
         }),
@@ -105,6 +111,9 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
         onClose();
         setTitle("");
         setBody("");
+        setStartDate("");
+        setEndDate("");
+        setDueDate("");
         setSelectedLabels([]);
         setSelectedAssignees([]);
       } else {
@@ -205,6 +214,39 @@ export function CreateIssueModal({ isOpen, onClose, onSuccess }: CreateIssueModa
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="font-mono text-[11px] uppercase text-text-dim tracking-wider">Roadmap Dates (Optional)</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="text-[11px] font-mono text-text-dim uppercase tracking-wide">
+                    Start
+                    <input
+                      type="date"
+                      className="mt-1 w-full bg-surface-well border border-border rounded-sm py-2 px-3 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-[11px] font-mono text-text-dim uppercase tracking-wide">
+                    End
+                    <input
+                      type="date"
+                      className="mt-1 w-full bg-surface-well border border-border rounded-sm py-2 px-3 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-[11px] font-mono text-text-dim uppercase tracking-wide">
+                    Deadline
+                    <input
+                      type="date"
+                      className="mt-1 w-full bg-surface-well border border-border rounded-sm py-2 px-3 text-sm text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                    />
+                  </label>
+                </div>
               </div>
 
               <div className="space-y-2">

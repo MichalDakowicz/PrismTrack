@@ -5,6 +5,7 @@ import { useProjects } from "../contexts/ProjectContext";
 import { Project } from "../types";
 import { Board } from "./Board";
 import { IssuesList } from "./IssuesList";
+import { Timeline } from "./Timeline";
 
 const validViews = [
     "board",
@@ -236,10 +237,7 @@ export function ProjectDetail() {
                 {view === "board" && <Board />}
                 {view === "list" && <IssuesList />}
                 {view === "timeline" && (
-                    <EmptyScopedView
-                        title="Timeline view"
-                        description="Timeline bars and milestone pins will appear here for the active project."
-                    />
+                    <Timeline />
                 )}
                 {view === "activity" && (
                     <EmptyScopedView

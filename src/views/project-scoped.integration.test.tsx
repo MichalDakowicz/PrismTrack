@@ -20,6 +20,8 @@ describe("project scoped integration", () => {
   });
 
   it("navigates from Projects and keeps active project scope across project tabs", async () => {
+    const now = new Date().toISOString();
+
     vi.spyOn(global, "fetch").mockImplementation(async (input) => {
       const url = String(input);
 
@@ -65,8 +67,8 @@ describe("project scoped integration", () => {
               state: "open",
               user: { id: 1, login: "octo", avatar_url: "https://example.com/u1.png", name: "Octo" },
               labels: [],
-              created_at: "2024-01-01",
-              updated_at: "2024-01-01",
+              created_at: now,
+              updated_at: now,
               html_url: "https://example.com/issues/101",
               repository_url: "https://api.github.com/repos/acme/web",
             },
@@ -78,8 +80,8 @@ describe("project scoped integration", () => {
               state: "open",
               user: { id: 1, login: "octo", avatar_url: "https://example.com/u2.png", name: "Octo" },
               labels: [],
-              created_at: "2024-01-01",
-              updated_at: "2024-01-01",
+              created_at: now,
+              updated_at: now,
               html_url: "https://example.com/issues/102",
               repository_url: "https://api.github.com/repos/acme/legacy",
             },
@@ -114,6 +116,12 @@ describe("project scoped integration", () => {
 
     expect(await screen.findByRole("heading", { name: "Issues" })).toBeInTheDocument();
     expect(screen.getByText("1 Open")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("link", { name: /Timeline/i })[0]);
+
+    expect(await screen.findByRole("heading", { name: "Timeline" })).toBeInTheDocument();
+    expect(screen.getByText(/acme\/web/i)).toBeInTheDocument();
+    expect(screen.queryByText(/acme\/legacy/i)).not.toBeInTheDocument();
   });
 
   it("shows deterministic empty state when a project has zero linked repositories", async () => {
