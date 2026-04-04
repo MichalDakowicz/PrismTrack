@@ -6,6 +6,8 @@ import { Project } from "../types";
 import { Board } from "./Board";
 import { IssuesList } from "./IssuesList";
 import { Timeline } from "./Timeline";
+import { ActivityFeed } from "./ActivityFeed";
+import { Pulse } from "./Pulse";
 
 const validViews = [
     "board",
@@ -240,16 +242,10 @@ export function ProjectDetail() {
                     <Timeline />
                 )}
                 {view === "activity" && (
-                    <EmptyScopedView
-                        title="Activity feed"
-                        description="Webhook-driven project events will appear here for the active project."
-                    />
+                    <ActivityFeed />
                 )}
                 {view === "pulse" && (
-                    <EmptyScopedView
-                        title="Pulse calendar"
-                        description="Contribution heatmap for the active project will appear here."
-                    />
+                    <Pulse />
                 )}
                 {view === "settings" && (
                     <ProjectSettingsPanel project={project} />

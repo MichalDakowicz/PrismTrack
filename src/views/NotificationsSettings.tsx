@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Bell, Mail, MessageSquare, Check, Loader2, Smartphone, Monitor } from "lucide-react";
+import { Bell, Mail, MessageSquare, Check, Loader2, Smartphone, CalendarDays } from "lucide-react";
 import { cn } from "../lib/utils";
+import { SettingsHeader, SettingsSection } from "../components/SettingsPrimitives";
 
 interface NotificationChannel {
   id: string;
@@ -43,14 +44,18 @@ export function NotificationsSettings({
   const [selectedChannels, setSelectedChannels] = useState(channels);
   const [notificationSettings, setNotificationSettings] = useState(settings);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [digest, setDigest] = useState<"off" | "daily" | "weekly">("daily");
 
   const toggleChannel = (channelId: string) => {
+    setSaved(false);
     setSelectedChannels(channels =>
       channels.map(ch => ch.id === channelId ? { ...ch, enabled: !ch.enabled } : ch)
     );
   };
 
   const toggleNotificationChannel = (settingId: string, channelType: "email" | "slack" | "discord" | "webhook") => {
+    setSaved(false);
     setNotificationSettings(settings =>
       settings.map(s => {
         if (s.id !== settingId) return s;
@@ -71,36 +76,25 @@ export function NotificationsSettings({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 250));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1800);
     } finally {
       setSaving(false);
     }
   };
 
-  const getChannelIcon = (type: string) => {
-    switch (type) {
-      case "email": return Mail;
-      case "slack": return MessageSquare;
-      default: return Bell;
-    }
-  };
-
   return (
     <div className="flex flex-col h-full">
-      <header className="shrink-0 border-b border-border bg-surface/80 backdrop-blur-md px-6 py-4">
-        <h1 className="text-xl font-semibold text-text-main tracking-tight">Notifications</h1>
-        <p className="text-sm text-text-dim mt-1">Configure notification channels and preferences</p>
-      </header>
+      <SettingsHeader title="Notifications" description="Configure notification channels and preferences" />
 
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-3xl space-y-8">
-          <section className="bg-surface border border-border rounded-sm p-6">
-            <h2 className="text-base font-semibold text-text-main mb-4 flex items-center gap-2">
-              <Bell className="w-4 h-4" />
-              Notification Channels
-            </h2>
-            <p className="text-sm text-text-dim mb-4">Enable and configure your notification delivery methods</p>
-            
+          <SettingsSection
+            title="Notification Channels"
+            description="Enable and configure your notification delivery methods"
+            icon={<Bell className="w-4 h-4" />}
+          >
             <div className="space-y-3">
               {selectedChannels.map((channel) => {
                 const ChannelIcon = channel.icon;
@@ -137,14 +131,13 @@ export function NotificationsSettings({
                 );
               })}
             </div>
-          </section>
+          </SettingsSection>
 
-          <section className="bg-surface border border-border rounded-sm p-6">
-            <h2 className="text-base font-semibold text-text-main mb-4 flex items-center gap-2">
-              <Smartphone className="w-4 h-4" />
-              Notification Preferences
-            </h2>
-            <p className="text-sm text-text-dim mb-4">Choose which events trigger notifications and how</p>
+          <SettingsSection
+            title="Notification Preferences"
+            description="Choose which events trigger notifications and how"
+            icon={<Smartphone className="w-4 h-4" />}
+          >
 
             <div className="space-y-4">
               {notificationSettings.map((setting) => (
@@ -182,7 +175,29 @@ export function NotificationsSettings({
                 </div>
               ))}
             </div>
-          </section>
+
+            <div className="mt-5 pt-4 border-t border-border">
+              <label htmlFor="digest" className="block text-sm font-mono text-text-dim mb-1.5">
+                Email Digest
+              </label>
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-text-dim" />
+                <select
+                  id="digest"
+                  value={digest}
+                  onChange={(e) => {
+                    setDigest(e.target.value as "off" | "daily" | "weekly");
+                    setSaved(false);
+                  }}
+                  className="bg-surface-hover border border-border rounded-sm py-2 px-3 text-sm font-mono text-text-main focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                >
+                  <option value="off">Off</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+            </div>
+          </SettingsSection>
 
           <div className="flex items-center justify-end pt-4 border-t border-border">
             <button
@@ -201,7 +216,7 @@ export function NotificationsSettings({
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  Save Preferences
+                  {saved ? "Saved" : "Save Preferences"}
                 </>
               )}
             </button>

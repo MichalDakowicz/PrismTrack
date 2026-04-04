@@ -51,6 +51,31 @@ export interface PullRequest {
   html_url: string;
   repository_url?: string;
   repository?: Repository;
+  body?: string | null;
+  draft?: boolean;
+  base_ref?: string;
+  head_ref?: string;
+  requested_reviewers?: User[];
+  reviews?: PullRequestReview[];
+  reviewSummary?: PullRequestReviewSummary;
+}
+
+export interface PullRequestReview {
+  id: number;
+  body: string;
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING" | string;
+  user: User;
+  submitted_at: string;
+  html_url?: string;
+}
+
+export interface PullRequestReviewSummary {
+  approvedCount: number;
+  changesRequestedCount: number;
+  commentedCount: number;
+  requestedReviewers: User[];
+  latestReview: PullRequestReview | null;
+  reviewDecision: "approved" | "changes_requested" | "commented" | "pending" | "none";
 }
 
 export interface Repository {

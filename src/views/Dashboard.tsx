@@ -143,13 +143,31 @@ export function Dashboard() {
                       <h3 className="text-[14px] font-medium text-text-main">{pr.title}</h3>
                       <span className="font-mono text-[12px] text-text-dim">#{pr.number}</span>
                     </div>
-                    <div className={cn(
-                      "px-2 py-0.5 rounded-sm font-mono text-[11px] border flex items-center gap-1 shrink-0",
-                      pr.state === "open" ? "bg-primary/10 text-primary border-primary/20" :
-                      "bg-accent/10 text-accent border-accent/20"
-                    )}>
-                      <GitPullRequest className="w-3 h-3" />
-                      {pr.state}
+                    <div className="flex flex-col items-end gap-2 shrink-0">
+                      <div className={cn(
+                        "px-2 py-0.5 rounded-sm font-mono text-[11px] border flex items-center gap-1",
+                        pr.state === "open" ? "bg-primary/10 text-primary border-primary/20" :
+                        "bg-accent/10 text-accent border-accent/20"
+                      )}>
+                        <GitPullRequest className="w-3 h-3" />
+                        {pr.state}
+                      </div>
+                      {pr.reviewSummary && (
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-sm border text-[10px] font-mono uppercase tracking-wider",
+                          pr.reviewSummary.reviewDecision === "approved" && "bg-accent/10 text-accent border-accent/20",
+                          pr.reviewSummary.reviewDecision === "changes_requested" && "bg-red-500/10 text-red-300 border-red-500/20",
+                          pr.reviewSummary.reviewDecision === "pending" && "bg-amber-500/10 text-amber-300 border-amber-500/20",
+                          pr.reviewSummary.reviewDecision === "commented" && "bg-surface-hover text-text-dim border-border",
+                          pr.reviewSummary.reviewDecision === "none" && "bg-surface-hover text-text-dim border-border",
+                        )}>
+                          {pr.reviewSummary.reviewDecision === "approved" && "Approved"}
+                          {pr.reviewSummary.reviewDecision === "changes_requested" && "Changes requested"}
+                          {pr.reviewSummary.reviewDecision === "pending" && "Needs review"}
+                          {pr.reviewSummary.reviewDecision === "commented" && "Commented"}
+                          {pr.reviewSummary.reviewDecision === "none" && "No reviews"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </motion.div>

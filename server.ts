@@ -21,6 +21,9 @@ import {
   extractIssueDateMetadata,
   IssueDateMetadata,
 } from "./src/lib/issueMetadata";
+import { getRepositoryFullName } from "./src/lib/projectSelectors";
+import { summarizePullRequestReviews } from "./src/lib/pullRequestReviews";
+import type { PullRequestReview, User } from "./src/types";
 
 dotenv.config();
 
@@ -158,6 +161,26 @@ function normalizeLinkedRepositories(input: unknown): ProjectRepositoryLinkRecor
   });
 
   return Array.from(deduped.values());
+}
+
+function mapGitHubUser(user: any, fallbackLogin = "unknown"): User {
+  return {
+    id: typeof user?.id === "number" ? user.id : 0,
+    login: typeof user?.login === "string" ? user.login : fallbackLogin,
+    avatar_url: typeof user?.avatar_url === "string" ? user.avatar_url : "",
+    name: typeof user?.name === "string" ? user.name : typeof user?.login === "string" ? user.login : fallbackLogin,
+  };
+}
+
+function mapGitHubReview(review: any): PullRequestReview {
+  return {
+    id: typeof review?.id === "number" ? review.id : 0,
+    body: typeof review?.body === "string" ? review.body : "",
+    state: typeof review?.state === "string" ? review.state : "PENDING",
+    user: mapGitHubUser(review?.user),
+    submitted_at: typeof review?.submitted_at === "string" ? review.submitted_at : new Date().toISOString(),
+    html_url: typeof review?.html_url === "string" ? review.html_url : undefined,
+  };
 }
 
 async function startServer() {
@@ -526,7 +549,59 @@ async function startServer() {
         },
       });
       const data = await response.json();
-      res.json(data.items || []);
+      const pulls = Array.isArray(data.items) ? data.items.slice(0, 25) : [];
+
+      const enrichedPulls = await Promise.all(
+        pulls.map(async (pull: any) => {
+          const repositoryFullName = getRepositoryFullName(pull.repository_url) || getRepositoryFullName(pull.pull_request?.url);
+          if (!repositoryFullName || typeof pull.number !== "number") {
+            return pull;
+          }
+
+          try {
+            const [detailResponse, reviewsResponse] = await Promise.all([
+              fetch(`https://api.github.com/repos/${repositoryFullName}/pulls/${pull.number}`, {
+                headers: {
+                  Authorization: `token ${token}`,
+                  "User-Agent": "PrismTrack",
+                },
+              }),
+              fetch(`https://api.github.com/repos/${repositoryFullName}/pulls/${pull.number}/reviews?per_page=20`, {
+                headers: {
+                  Authorization: `token ${token}`,
+                  "User-Agent": "PrismTrack",
+                },
+              }),
+            ]);
+
+            const detail = detailResponse.ok ? await detailResponse.json() : {};
+            const reviewsData = reviewsResponse.ok ? await reviewsResponse.json() : [];
+            const requestedReviewers = Array.isArray(detail.requested_reviewers)
+              ? detail.requested_reviewers.map((reviewer: any) => mapGitHubUser(reviewer))
+              : [];
+            const reviews = Array.isArray(reviewsData)
+              ? reviewsData.map((review: any) => mapGitHubReview(review))
+              : [];
+            const reviewSummary = summarizePullRequestReviews(reviews, requestedReviewers);
+
+            return {
+              ...pull,
+              body: typeof detail.body === "string" ? detail.body : pull.body || "",
+              draft: !!detail.draft,
+              base_ref: detail.base?.ref,
+              head_ref: detail.head?.ref,
+              requested_reviewers: requestedReviewers,
+              reviews: reviews.slice(0, 5),
+              reviewSummary,
+            };
+          } catch (error) {
+            console.error(`Failed to enrich pull request ${pull.number}:`, error);
+            return pull;
+          }
+        })
+      );
+
+      res.json(enrichedPulls);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch pull requests" });
     }
